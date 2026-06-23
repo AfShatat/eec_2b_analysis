@@ -1818,8 +1818,9 @@ void Build_templates(const AnalysisConfig& cfg, Long64_t ev_first = 0, Long64_t 
 	// -- For b-tagging correction after unfolding (at particle level): simple counts
 	// -- Think: Do you need to add 2svx cut on the Num? (I think so), and it should have the event weight as usual ?
 	TH3D* hgenjet_2b = new TH3D("hgenjet_2b", "b-tagging eff. DENO;m_{2B} [GeV];DeltaR;p_{T} [GeV]", n_mb, mb_binsVector, n_dr, dr_binsVector, n_pt, jtpt_binsVector); // before btagging
-	TH3D* hgenjet_2b_passbtag = new TH3D("hgenjet_2b_passbtag", "b-tagging eff. NUM;m_{2B} [GeV];DeltaR;p_{T} [GeV]",  n_mb, mb_binsVector, n_dr, dr_binsVector, n_pt, jtpt_binsVector); // after btagging
-	
+	TH3D* hgenjet_2b_passbtag = new TH3D("hgenjet_2b_passbtag", "b-tagging Eff. Num ?;m_{2B} [GeV];DeltaR;p_{T} [GeV]",  n_mb, mb_binsVector, n_dr, dr_binsVector, n_pt, jtpt_binsVector); // after btagging
+	TH3D* hgenjet_2b_passbtag_modified = new TH3D("hgenjet_2b_passbtag_modified", "b-tagging eff. NUM? (btag + reco sv for reco jet included);m_{2B} [GeV];DeltaR;p_{T} [GeV]",  n_mb, mb_binsVector, n_dr, dr_binsVector, n_pt, jtpt_binsVector); // after btagging
+
 	
   /////////////////////////////////////////////////////////
     //// Variables related to data/reco MC  
@@ -1997,7 +1998,10 @@ void Build_templates(const AnalysisConfig& cfg, Long64_t ev_first = 0, Long64_t 
                   dr_reco  = t.calc_dr(reco_sv_rm[0].Eta(), reco_sv_rm[0].Phi(),
                                        reco_sv_rm[1].Eta(), reco_sv_rm[1].Phi());
                   eec_reco = std::pow(reco_sv_rm[0].Pt() * reco_sv_rm[1].Pt(), cfg.n);
-              }
+
+				// -- Fill also Num of Btagging Eff. (btagged jets + applied reco sv conditions)
+				   hgenjet_2b_passbtag_modified ->Fill(mB_gen, dr_gen, jpt_gen, w_gen);
+			   }
 
               // Overflow protection
               double mB_reco_fill = mB_reco, dr_reco_fill = dr_reco;
@@ -2012,7 +2016,7 @@ void Build_templates(const AnalysisConfig& cfg, Long64_t ev_first = 0, Long64_t 
                 //if (dr_gen_fill  < dr_min)  dr_gen_fill = dr_min_fill;  // underflow use or not ?
 
 
-                            // reco_pass: full detector-level selection
+            // reco_pass: full detector-level selection
             bool reco_pass = reco_sv_ok &&
                              passRecoJetKinematics(t, ijet, cfg); 
                              // passBtag(t, ijet, cfg); // Following suggestion1: no need for repetition
@@ -2179,6 +2183,11 @@ void Build_templates(const AnalysisConfig& cfg, Long64_t ev_first = 0, Long64_t 
     h_full_eff_den->Add(h_half1_eff_den);
     TH3D *h_full_eff = divide(h_full_eff_num, h_full_eff_den, "h_full_efficiency_tf");
 
+	// -- Create b-tagging Eff. plots 
+	TH3D* hbtagEff_passbtag = divide(hgenjet_2b_passbtag, hgenjet_2b, "hbtagEff_passbtag");
+	TH3D* hbtagEff_passbtag_modified = divide(hgenjet_2b_passbtag_modified, hgenjet_2b, "hbtagEff_passbtag_modified");
+
+	  
     std::cout << "Creating: " << ResponseMatrix_fout_name << std::endl;
 
     //// WRITE OUTPUT RESPONSE MATRIX 
@@ -2192,9 +2201,13 @@ void Build_templates(const AnalysisConfig& cfg, Long64_t ev_first = 0, Long64_t 
     h_full_purity_num->Write(); h_full_purity_den->Write(); h_full_purity->Write();
     h_full_eff_num->Write();    h_full_eff_den->Write();    h_full_eff->Write();
     response_full->Write();
-    
-	hgenjet_2b ->Write();
-	hgenjet_2b_passbtag ->Write();
+	   
+	    // for btagging Eff. 
+		hgenjet_2b ->Write();
+		hgenjet_2b_passbtag ->Write();
+		hgenjet_2b_passbtag_modified->Write();
+		hbtagEff_passbtag->Write();
+		hbtagEff_passbtag_modified->Write();
     
 	fout_rm->Close();
     delete fout_rm;
