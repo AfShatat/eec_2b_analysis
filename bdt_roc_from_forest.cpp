@@ -150,10 +150,10 @@ static std::vector<TString> expand_files(TString pattern) {
 //            A "[0-9]" in the path is expanded to dirs 0..9 and all are chained.
 // RunN     : 2 or 3 (controls branches/trigger via tTree::Init)
 void bdt_roc_from_forest(TString filename = "/data_CMS/cms/mnguyen/bJetAggRun3/PPRef2024/QCD/HiForestMiniAOD_v2_TChains.root",
-                         Float_t pT_low = 80, Float_t pT_high = 140,
+                         Float_t pT_low = 100, Float_t pT_high = 200,
                          Int_t RunN = 3, bool isMC = true,
                          TString out_tag = "bdt_roc_from_forest",
-                         bool btag = true, Float_t btagWP = -1) {
+                         bool btag = true, Float_t btagWP = 0.868) {
 
   if (filename == "") {
     std::cerr << "Please pass a forest file path, e.g.\n"
