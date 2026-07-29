@@ -33,6 +33,36 @@ TFile *openOrWarn(const TString &name)
     return f;
 }
 
+
+struct RefoldGof {
+    double chi2   = 0.;
+    int    ndf    = 0;
+    double pvalue = -1.;
+    double chi2ndf() const { return ndf > 0 ? chi2 / ndf : -1.; }
+};
+
+RefoldGof refoldChi2(const TH2D *h_refolded, const TH2D *h_input,
+                     int ix_min, int ix_max, int iy_min, int iy_max)
+{
+    RefoldGof g;
+    if (!h_refolded || !h_input) return g;
+    for (int iy = iy_min; iy <= iy_max; ++iy) {
+        for (int ix = ix_min; ix <= ix_max; ++ix) {
+            const double d  = h_input->GetBinContent(ix, iy);
+            const double ed = h_input->GetBinError(ix, iy);
+            const double r  = h_refolded->GetBinContent(ix, iy);
+            if (d == 0. || ed <= 0.) continue;
+            const double pull = (r - d) / ed;
+            g.chi2 += pull * pull;
+            ++g.ndf;
+        }
+    }
+    // ndf = number of bins compared. Refolding is not a fit to the input distribution,
+    // so there are no fitted parameters to subtract.
+    if (g.ndf > 0) g.pvalue = TMath::Prob(g.chi2, g.ndf);
+    return g;
+}
+
 bool normalizeToUnitArea(TH1D *h)
 {
     if (!h) return false;
@@ -48,7 +78,7 @@ bool normalizeToUnitArea(TH1D *h)
 
 
 void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TString pT_selection,
-                     int test_mode, bool unfoldBayes)
+                     int test_mode, bool unfoldBayes, bool scan_niter)
 {
     //Select unfolding options. test_mode and unfoldBayes are passed in as arguments:
     //   test_mode 0 = FULL-MC closure : input h3D_bb (full sample), full-sample response/purity/eff,
@@ -59,6 +89,12 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
     //   test_mode 2 = DATA            : input h3D_data + template-fit signal fraction, full-sample corrections,
     //                         truth = hgenjet_2b_passbtag (reference).
     //   unfoldBayes: true = Bayesian unfolding, false = matrix inversion.
+    //   scan_niter = true  -> run niter = 1..100, save the multi-page PDF + one PNG per iteration,
+    //                         AND the refolding goodness-of-fit scan that picks the optimal niter
+    //                         (refolding_pvalue_vs_iteration_*.{pdf,png,root}). Bayesian only:
+    //                         matrix inversion has no iterations to scan.
+    //   scan_niter = false -> single unfolding with niter = 4, save the usual single bottomline
+    //                         plot. The refolding chi2/p-value of that one iteration is still printed.
     const bool split_test       = (test_mode == 1);  // -> pseudo (odd-half) corrections + even-half truth
     const bool is_data          = (test_mode == 2);
     const bool multiply_sigfrac = is_data;           // only real data needs the bb template fit
@@ -66,9 +102,6 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
     // true-2b jets. It is NOT a bb-purity, so h3D_pseudodata_bb still needs it: that input
     // contains jets whose gen jet fails gen_pass, and the response has no truth row for them.
     bool apply_purity = true;
-    // scan_niter = true  -> run niter = 1..100, save the multi-page PDF + one PNG per iteration.
-    // scan_niter = false -> single unfolding with niter = 4, save the usual single bottomline plot.
-    bool scan_niter = true;
 
 
     const Color_t blue = ROCColor::blue();
@@ -78,17 +111,17 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
     const Color_t orange = ROCColor::orange();
     const Color_t teal = ROCColor::teal();
 
-    TString filename_template_fit = "/home/llr/cms/zaidan/analysis_lise/eec_2b_analysis/TemplateFit_Run3/TemplateFits_Run3_minHLT60_LinearBin/nominal_Run3_TemplateFits_histos_3d_80_200.root";
+    TString filename_template_fit = "/home/llr/cms/zaidan/analysis_lise/eec_2b_analysis/TemplateFit_Run3/TemplateFits_Run3_minHLT60_LinearBin/nominal_Run3_TemplateFits_histos_3d_80_inf.root";
     std::cout << "Using template file: " << filename_template_fit << std::endl;
 
-    TString filename_response = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/RMatrix_Run3_btagWP868_template_for_fit_histos_3D_qcd_f.root";  //RMatrix_Run3_btagWP868_template_for_fit_histos_3D_qcd_f.root"; //folder + "RMatrix_Run3_btagWP868_template_for_fit_histos_3D_qcd_f.root";
+    TString filename_response = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/RMatrix_Run3_btagWP868_template_for_fit_histos_3D_qcd_f_80_120_2.root";///data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/RMatrix_Run3_btagWP868_template_for_fit_histos_3D_qcd_f.root";  //RMatrix_Run3_btagWP868_template_for_fit_histos_3D_qcd_f.root"; //folder + "RMatrix_Run3_btagWP868_template_for_fit_histos_3D_qcd_f.root";
     std::cout << "Using response file: " << filename_response << std::endl;
 
     // Modes 0/1 unfold MC (h3D_bb / h3D_pseudodata_bb), which live in the MCGEN file.
     // Mode 2 unfolds real data from the data file.
     TString filename_data = is_data
-        ? "/data_CMS/cms/zaidan/analysis_lise/Run3/Run3_btagWP868_template_for_fit_histos_3D_data_f.root"
-        : "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/Run3_btagWP868_template_for_fit_histos_3D_qcd_fMCGEN.root";
+        ? "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/HardProbes/agg_template_chunks/Run3_btagWP868_template_for_fit_histos_3D_data_f_80_120_2MCGEN.root"
+        : "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/Run3_btagWP868_template_for_fit_histos_3D_qcd_f_80_120_2MCGEN.root";
     std::cout << "Getting data from " << filename_data << std::endl; //
     //Select central pT bin
     int ibin_pt = 2;
@@ -100,6 +133,7 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
               << "\n\tmultiply_sigfrac:" << multiply_sigfrac
               << "\n\tsplit_test:" << split_test
               << "\n\tapply_purity:" << apply_purity
+              << "\n\tscan_niter:" << scan_niter
               << std::endl;
 
 
@@ -134,6 +168,20 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
     std::cout << "Getting response + corrections from : " << fname_unfolding << std::endl;
     TFile *fin_unfolding = openOrWarn(fname_unfolding);
     if (!fin_unfolding) return;
+
+    // hadd (and any summing merger) sums the per-block RATIO histograms across blocks,
+    // giving N_blocks x the true value (e.g. hEECweightEff ~ 10 x 1.67 ~ 17). So DON'T read
+    // the pre-divided ratios; recompute every correction here from the COUNT histograms,
+    // which sum correctly. opt "b" = binomial (num is a subset of den), "" = normal errors.
+    auto ratioFromCounts = [&](const char* num, const char* den, const char* opt) -> TH2D* {
+        TH2D* hn = getOrWarn<TH2D>(fin_unfolding, num);
+        TH2D* hd = getOrWarn<TH2D>(fin_unfolding, den);
+        if (!hn || !hd) return nullptr;
+        TH2D* r = (TH2D*) hn->Clone(Form("ratio_%s_over_%s", num, den));
+        r->SetDirectory(0);
+        r->Divide(hn, hd, 1., 1., opt);
+        return r;
+    };
 
     // ----------- Grab data -----------
     TFile *fin_data = openOrWarn(filename_data);
@@ -225,10 +273,11 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
               << std::endl;
 
     // ---- Grab the truth level MC ----
-    TString fname_response_truth =  "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/RMatrix_Run3_btagWP868_template_for_fit_histos_3D_qcd_f.root"; //"/data_CMS/cms/zaidan/analysis_lise/Run3/RMatrix_Run3_btagWP868_template_for_fit_histos_3D_qcd_f.root";
-    std::cout << "Getting truth from : " << fname_response_truth << std::endl;
-    TFile *fin_response_truth = openOrWarn(fname_response_truth);
-    if (!fin_response_truth) return;
+    // Must be the SAME production as filename_response: the truth, the response and the
+    // purity/efficiency corrections have to come from one set of events with one pT
+    // binning, otherwise the full-MC closure (test_mode 0) cannot be exactly 1.
+    TFile *fin_response_truth = fin_unfolding;
+    std::cout << "Getting truth from : " << fin_response_truth->GetName() << std::endl;
     TH2D *h_mc_true = nullptr;
     if (test_mode == 1) {
         // Split test: the even half's gen distribution -- same gen_pass gate and same w_reco
@@ -238,8 +287,10 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
         // Full-MC closure: the full-sample all-gen distribution the chain recovers by construction.
         h_mc_true = getOrWarn<TH2D>(fin_response_truth, "h_full_efficiency_denominator_tf");
     } else {
-        // Data: gen reference.
-        h_mc_true = getOrWarn<TH2D>(fin_response_truth, "hgenjet_2b_passbtag");
+        // Data: gen reference. After the combined SV-reco + b-tag correction below, the
+        // result is at the "all true 2b" level, so compare against hgenjet_2b_all (the
+        // combined-efficiency denominator), not hgenjet_2b_passbtag (2SV+btag level).
+        h_mc_true = getOrWarn<TH2D>(fin_response_truth, "hgenjet_2b_all");
     }
     if (!h_mc_true) return;
 
@@ -266,21 +317,30 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
     TString png_dir  = home_llr + "bayesian_unfolding_iterations_" + label + "_png/"; // one PNG per iteration lands here
     if (scan_niter) gSystem->mkdir(png_dir, kTRUE);                     // create the PNG folder if it does not exist
     const int niter_min = 0;
-    const int niter_max = scan_niter ? 99 : 0;   // one pass only when not scanning
+    const int niter_max = scan_niter ? 49 : 0;   // scan niter = 1..niter_max+1; one pass when not scanning
     const Int_t prev_ignore = gErrorIgnoreLevel;
     if (scan_niter) gErrorIgnoreLevel = kError;  // silence "Replacing existing histogram" spam from re-cloning each pass
 
+    // Refolding goodness-of-fit vs iteration (see refoldChi2 above). Filled on every pass;
+    // only used for the regularisation plot when scan_niter is on.
+    // The optimal iteration is the FIRST one whose refolding p-value clears this threshold:
+    // earlier iterations are still non-closing, later ones only overfit the input further.
+    const double pvalue_threshold = 0.05;
+    std::vector<double> v_niter, v_pvalue_all, v_pvalue_pt, v_chi2ndf_all, v_chi2ndf_pt;
+
     for (int iter = niter_min; iter <= niter_max; ++iter) {
 
+    // Single non-scan pass keeps the nominal 4 iterations; the scan walks 1..100.
+    const Int_t niter_now = scan_niter ? iter + 1 : 8;
+
     // ---- Unfold
-    std::cout << "\t---->Unfolding (niter = " << (scan_niter ? iter + 1 : 4) << ")" << std::endl;
+    std::cout << "\t---->Unfolding (niter = " << niter_now << ")" << std::endl;
     RooUnfold::ErrorTreatment errorTreatment = RooUnfold::kCovariance;
     TH2D *h_data_unfolded = nullptr;
     TMatrixD covariance_matrix_before_unfolding(dim,dim);
     TMatrixD covariance_matrix_after_unfolding(dim,dim);
     if (unfoldBayes) {
-        Int_t niter = scan_niter ? iter + 1 : 4;   // scan: 1..100 ; otherwise fixed 4
-        RooUnfoldBayes unfold(response, h_data_purity_corrected, niter);
+        RooUnfoldBayes unfold(response, h_data_purity_corrected, niter_now);
         // Clone before `unfold` leaves scope: some RooUnfold versions hand back a cached
         // histogram that the unfolder owns and deletes with itself.
         h_data_unfolded = (TH2D *) unfold.Hreco(errorTreatment)->Clone("h_data_unfolded");
@@ -297,6 +357,26 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
     std::cout << "\t---->Refolding" << std::endl;
     TH2D *h_data_refolded = (TH2D *) response->ApplyToTruth(h_data_unfolded, "h_data_refolded");
 
+    // ---- Refolding goodness of fit, against the distribution that went INTO the unfolding
+    // (h_data_purity_corrected -- the same object handed to RooUnfoldBayes above), not the
+    // raw h_data_reco: the refolded distribution lives at the purity-corrected level too.
+    // "all" = the whole 2D reco space that was unfolded; "pt" = the pT bin actually plotted.
+    const RefoldGof gof_all = refoldChi2(h_data_refolded, h_data_purity_corrected,
+                                         ibin_dr_min, ibin_dr_max, 1, bins_pt);
+    const RefoldGof gof_pt  = refoldChi2(h_data_refolded, h_data_purity_corrected,
+                                         ibin_dr_min, ibin_dr_max, ibin_pt, ibin_pt);
+    std::cout << Form("\t---->Refolding GoF  niter = %3d | 2D: chi2/ndf = %8.2f/%3d = %6.3f, "
+                      "p = %8.3e | pT bin %d: chi2/ndf = %8.2f/%3d = %6.3f, p = %8.3e",
+                      niter_now,
+                      gof_all.chi2, gof_all.ndf, gof_all.chi2ndf(), gof_all.pvalue,
+                      ibin_pt, gof_pt.chi2, gof_pt.ndf, gof_pt.chi2ndf(), gof_pt.pvalue)
+              << std::endl;
+    v_niter.push_back(niter_now);
+    v_pvalue_all.push_back(gof_all.pvalue);
+    v_pvalue_pt.push_back(gof_pt.pvalue);
+    v_chi2ndf_all.push_back(gof_all.chi2ndf());
+    v_chi2ndf_pt.push_back(gof_pt.chi2ndf());
+
     // ---- Apply efficiency correction
     std::cout << "\t---->Dividing by recostruction efficiency" << std::endl;
     TH2D *h_data_efficiency_corrected = (TH2D *) h_data_unfolded->Clone("h_data_efficiency_corrected");
@@ -304,6 +384,241 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
 
     // ---- Final corrections
     TH2D *h_data_fully_corrected = (TH2D *) h_data_efficiency_corrected->Clone("h_data_fully_corrected");
+
+    // ---- Combined SV-reconstruction + b-tag efficiency correction (data only) ----
+    // Peels BOTH the 2-SV reconstruction and the b-tag selection off the truth level,
+    // taking the result from "2b jets reconstructed with 2 SV and tagged" to "all true 2b".
+    // Orthogonal to the reconstruction-kinematic efficiency (h_full_efficiency) applied above.
+    // Skipped in closure modes (0/1), whose truth targets live at the 2SV+btag level.
+    if (test_mode == 2) {
+        TH2D *h_svbtag_eff = ratioFromCounts("hgenjet_2b_reco_btag", "hgenjet_2b_all", "b");
+        if (h_svbtag_eff) {
+            std::cout << "\t---->Dividing by combined SV-reco + b-tag efficiency" << std::endl;
+            // systematic hook: scale h_svbtag_eff by the CMS b-tag SF map here, then vary SF +/-.
+            h_data_fully_corrected->Divide(h_svbtag_eff);
+        }
+        // EEC-weight correction: convert the reco-EEC-weighted result to gen-EEC-weighted.
+        // r_eec = sum(eec_gen)/sum(eec_reco) over reconstructed 2b jets -> MULTIPLY.
+        TH2D *h_eec_weight_eff = ratioFromCounts("hgenjet_2b_reco_btag", "hgenjet_2b_passbtag", "");
+        if (h_eec_weight_eff) {
+            std::cout << "\t---->Multiplying by EEC-weight (reco->gen) correction" << std::endl;
+            h_data_fully_corrected->Multiply(h_eec_weight_eff);
+        }
+    }
+
+
+    // ---- Correction-stage plot: raw EEC (top) + incremental ratios (bottom), data only ----
+    // Top pad: EEC(dr) after unfolding with each correction stacked on (absolute).
+    // Bottom pad: each correction isolated as the fractional effect (ratio - 1); 0 = no effect.
+    // Same main/ratio layout, palette and fonts as the bottomline plot.
+    if (test_mode == 2) {
+        // normalise_corr_stages = true  -> every curve to unit area. The gen MC becomes directly
+        //   comparable, and the ratio pad shows the SHAPE effect of each correction -- the
+        //   relevant one for a normalised EEC. Writes ..._norm.{pdf,png}.
+        // normalise_corr_stages = false -> absolute EEC. The ratio pad shows the true SIZE of
+        //   each correction; the gen MC has no luminosity scaling, so it is scaled to the data
+        //   integral and is a shape reference only. Writes the unsuffixed files.
+        const bool normalise_corr_stages = true;
+        std::cout << "\t---->Making correction-stage EEC + ratio plot ("
+                  << (normalise_corr_stages ? "normalised" : "absolute") << ")" << std::endl;
+        TH2D *h_btag_c = ratioFromCounts("hgenjet_2b_passbtag",  "hgenjet_2b",          "b"); // b-tag only
+        TH2D *h_svb_c  = ratioFromCounts("hgenjet_2b_reco_btag", "hgenjet_2b_all",      "b"); // b-tag + 2SV
+        TH2D *h_eec_c  = ratioFromCounts("hgenjet_2b_reco_btag", "hgenjet_2b_passbtag", "");  // EEC weight
+
+        TH2D *h2_base   = (TH2D*) h_data_efficiency_corrected->Clone("h2_cmp_base");
+        TH2D *h2_btag   = (TH2D*) h_data_efficiency_corrected->Clone("h2_cmp_btag");
+        TH2D *h2_svbtag = (TH2D*) h_data_efficiency_corrected->Clone("h2_cmp_svbtag");
+        TH2D *h2_full   = (TH2D*) h_data_efficiency_corrected->Clone("h2_cmp_full");
+        if (h_btag_c) h2_btag->Divide(h_btag_c);
+        if (h_svb_c)  h2_svbtag->Divide(h_svb_c);
+        if (h_svb_c)  h2_full->Divide(h_svb_c);
+        if (h_eec_c)  h2_full->Multiply(h_eec_c);
+
+        TH1D *p_base   = h2_base  ->ProjectionX(Form("p_cmp_base_pt%d",   ibin_pt), ibin_pt, ibin_pt);
+        TH1D *p_btag   = h2_btag  ->ProjectionX(Form("p_cmp_btag_pt%d",   ibin_pt), ibin_pt, ibin_pt);
+        TH1D *p_svbtag = h2_svbtag->ProjectionX(Form("p_cmp_svbtag_pt%d", ibin_pt), ibin_pt, ibin_pt);
+        TH1D *p_full   = h2_full  ->ProjectionX(Form("p_cmp_full_pt%d",   ibin_pt), ibin_pt, ibin_pt);
+        // Gen MC at the level the fully corrected result targets -- for test_mode 2 that is
+        // hgenjet_2b_all, "all true 2b". This is the curve p_full is meant to land on, so the
+        // plot shows not just what each correction does but whether they arrive somewhere sane.
+        TH1D *p_true   = h_mc_true->ProjectionX(Form("p_cmp_true_pt%d",   ibin_pt), ibin_pt, ibin_pt);
+
+        int b1 = 1, b2 = p_base->GetNbinsX();
+        while (b1 <= p_base->GetNbinsX() && p_base->GetBinContent(b1) <= 0.) ++b1;
+        while (b2 >= 1                   && p_base->GetBinContent(b2) <= 0.) --b2;
+
+        // Whatever the mode, do this BEFORE the ratios below so they inherit it.
+        for (TH1D* h : {p_base, p_btag, p_svbtag, p_full, p_true}) h->GetXaxis()->SetRange(b1, b2);
+        if (normalise_corr_stages) {
+            for (TH1D* h : {p_base, p_btag, p_svbtag, p_full, p_true}) normalizeToUnitArea(h);
+        } else {
+            // The gen MC cannot be overlaid absolutely: it carries an MC event weight with no
+            // luminosity scaling, so its integral has no relation to the data's. Put it on the
+            // data's scale instead -- shape reference only, and the legend says so.
+            const double I_data_cmp = p_full->Integral(), I_true_cmp = p_true->Integral();
+            if (I_data_cmp > 0. && I_true_cmp > 0.) p_true->Scale(I_data_cmp / I_true_cmp);
+        }
+
+        // ratio of each stage to the PREVIOUS one, isolating that single correction:
+        //   b-tag = btag/after-unfolding, +2SV = svbtag/btag, +EEC = full/svbtag.  1 = no change.
+        TH1D *r_btag = (TH1D*) p_btag  ->Clone(Form("r_btag_pt%d", ibin_pt));  r_btag->Divide(p_base);
+        TH1D *r_2sv  = (TH1D*) p_svbtag->Clone(Form("r_2sv_pt%d",  ibin_pt));  r_2sv ->Divide(p_btag);
+        TH1D *r_eec  = (TH1D*) p_full  ->Clone(Form("r_eec_pt%d",  ibin_pt));  r_eec ->Divide(p_svbtag);
+
+        // ROCColor palette from the bottomline plot; each step keeps its colour top & bottom.
+        p_base  ->SetLineColor(blue);   p_base  ->SetMarkerColor(blue);   p_base  ->SetMarkerStyle(kOpenCircle);
+        p_btag  ->SetLineColor(purple); p_btag  ->SetMarkerColor(purple); p_btag  ->SetMarkerStyle(kFullCircle);
+        p_svbtag->SetLineColor(orange); p_svbtag->SetMarkerColor(orange); p_svbtag->SetMarkerStyle(kFullSquare);
+        p_full  ->SetLineColor(red);    p_full  ->SetMarkerColor(red);    p_full  ->SetMarkerStyle(kFullTriangleUp);
+        // Green: the four correction stages already own blue/purple/orange/red, and the truth has
+        // to read as a different kind of object from them.
+        p_true  ->SetLineColor(green);  p_true  ->SetMarkerColor(green);  p_true  ->SetMarkerStyle(kOpenTriangleUp);
+        r_btag->SetLineColor(purple); r_btag->SetMarkerColor(purple); r_btag->SetMarkerStyle(kFullCircle);
+        r_2sv ->SetLineColor(orange); r_2sv ->SetMarkerColor(orange); r_2sv ->SetMarkerStyle(kFullSquare);
+        r_eec ->SetLineColor(red);    r_eec ->SetMarkerColor(red);    r_eec ->SetMarkerStyle(kFullTriangleUp);
+        for (TH1D* h : {p_base, p_btag, p_svbtag, p_full, p_true, r_btag, r_2sv, r_eec}) {
+            h->SetStats(0); h->SetLineWidth(2); h->SetMarkerSize(1.2); h->GetXaxis()->SetRange(b1, b2);
+        }
+
+        double ymax = 0.;
+        for (TH1D* h : {p_base, p_btag, p_svbtag, p_full, p_true})
+            for (int i = b1; i <= b2; ++i) ymax = std::max(ymax, h->GetBinContent(i) + h->GetBinError(i));
+        double rmin = 1., rmax = 1.;
+        for (TH1D* h : {r_btag, r_2sv, r_eec})
+            for (int i = b1; i <= b2; ++i) { double v = h->GetBinContent(i); if (v <= 0.) continue; rmin = std::min(rmin, v); rmax = std::max(rmax, v); }
+        double rpad = 0.15 * (rmax - rmin) + 1e-6;
+
+        Float_t ptlo = h_data_reco->GetYaxis()->GetBinLowEdge(ibin_pt);
+        Float_t pthi = h_data_reco->GetYaxis()->GetBinUpEdge(ibin_pt);
+
+        // canvas + two pads (same main/ratio split as the bottomline plot)
+        TCanvas *c_cmp = new TCanvas(Form("c_corr_stages_pt%d", ibin_pt), "", 800, 800);
+        TPad *pad_main  = new TPad(Form("pad_cmp_main_%d",  ibin_pt), "", 0., 0.3, 1., 1.);
+        TPad *pad_ratio = new TPad(Form("pad_cmp_ratio_%d", ibin_pt), "", 0., 0.,  1., 0.3);
+        for (TPad *p : {pad_main, pad_ratio}) { p->SetTicks(1, 0); p->SetFillColor(0); }
+        pad_main ->SetMargin(0.13, 0.05, 0.00, 0.08);
+        pad_ratio->SetMargin(0.13, 0.05, 0.32, 0.00);
+        c_cmp->cd(); pad_main->Draw(); pad_ratio->Draw();
+
+        // ----- top: raw EEC(dr) with each correction -----
+        pad_main->cd();
+        p_base->SetTitle("");
+        p_base->GetYaxis()->SetRangeUser(0., ymax * 1.6);
+        p_base->GetYaxis()->SetTitle(normalise_corr_stages ? "normalised EEC(#Delta r)"
+                                                          : "EEC(#Delta r)");
+        p_base->GetYaxis()->CenterTitle(true);
+        p_base->GetYaxis()->SetTitleFont(font_code); p_base->GetYaxis()->SetTitleSize(title_size); p_base->GetYaxis()->SetTitleOffset(1.5);
+        p_base->GetYaxis()->SetLabelFont(font_code); p_base->GetYaxis()->SetLabelSize(label_size);
+        // The y range starts at 0 and this pad's bottom edge is shared with the ratio pad, so the
+        // "0" label sits exactly on the join and gets clipped in half. Hide it (label size 0).
+        p_base->GetYaxis()->ChangeLabel(1, -1, 0.);
+        p_base->GetXaxis()->SetLabelSize(0); p_base->GetXaxis()->SetTitleSize(0);   // x belongs to the ratio pad
+        // "after unfolding" as a histogram outline (value at bin centre, step style);
+        // the corrections as points (X0 = no horizontal / bin-width error bars).
+        p_base->SetLineWidth(2);
+        // Gen MC as an outline with its error band, like the bottomline plot, so it reads as the
+        // reference rather than as another correction stage.
+        p_base->Draw("HIST"); p_true->Draw("HIST E SAME");
+        p_btag->Draw("PE X0 SAME"); p_svbtag->Draw("PE X0 SAME"); p_full->Draw("PE X0 SAME");
+
+        TLegend *lg = new TLegend(0.17, 0.60, 0.60, 0.85);
+        lg->SetFillStyle(0); lg->SetBorderSize(0); lg->SetMargin(0.15);
+        lg->SetTextFont(font_code); lg->SetTextSize(legend_size * 0.8);
+        lg->SetHeader(pthi == jtpt_max ? Form("p_{T}^{jet} > %.0f GeV", ptlo)
+                                       : Form("%.0f < p_{T}^{jet} < %.0f GeV", ptlo, pthi));
+        lg->AddEntry(p_base,   "after unfolding",            "l");
+        lg->AddEntry(p_btag,   "+ b-tag eff.",               "pe1");
+        lg->AddEntry(p_svbtag, "+ b-tag + 2SV eff.",         "pe1");
+        lg->AddEntry(p_full,   "+ b-tag + 2SV + EEC weight", "pe1");
+        lg->AddEntry(p_true,   normalise_corr_stages ? "Gen MC" : "Gen MC (scaled to data)", "l");
+        lg->Draw();
+
+        // CMS Internal above the top axis (outside the frame)
+        TLatex cms; cms.SetNDC();
+        cms.SetTextFont(62); cms.SetTextSize(0.042); cms.DrawLatex(0.13, 0.945, "CMS");
+        cms.SetTextFont(52); cms.SetTextSize(0.034); cms.DrawLatex(0.235, 0.945, "Internal");
+        cms.SetTextFont(42); cms.SetTextSize(0.034); cms.DrawLatex(0.66, 0.945, "pp #sqrt{s} = 5.36 TeV");
+        pad_main->RedrawAxis();
+
+        // ----- bottom: incremental ratios (ratio - 1), colours matched to the added stage -----
+        pad_ratio->cd();
+        r_btag->SetTitle("");
+        r_btag->GetYaxis()->SetRangeUser(rmin - rpad, rmax + rpad);
+        // Short enough to fit the ratio pad's height: "ratio to prev. stage" runs past the pad
+        // edge and gets clipped mid-word.
+        r_btag->GetYaxis()->SetTitle("ratio to prev.");
+        r_btag->GetYaxis()->CenterTitle(true);
+        r_btag->GetYaxis()->SetTitleFont(font_code); r_btag->GetYaxis()->SetTitleSize(title_size); r_btag->GetYaxis()->SetTitleOffset(1.5);
+        r_btag->GetYaxis()->SetLabelFont(font_code); r_btag->GetYaxis()->SetLabelSize(label_size);
+        r_btag->GetYaxis()->SetNdivisions(505);
+        r_btag->GetXaxis()->SetTitle("#Delta r");
+        r_btag->GetXaxis()->CenterTitle(true);
+        // Precision-43 offsets scale off the (short) ratio-pad height: 3.2 put the title clean
+        // off the bottom of the canvas, so no x title was drawn at all. 1.3 lands it under the labels.
+        r_btag->GetXaxis()->SetTitleFont(font_code); r_btag->GetXaxis()->SetTitleSize(title_size); r_btag->GetXaxis()->SetTitleOffset(1.3);
+        r_btag->GetXaxis()->SetLabelFont(font_code); r_btag->GetXaxis()->SetLabelSize(label_size);
+        r_btag->Draw("PE X0"); r_2sv->Draw("PE X0 SAME"); r_eec->Draw("PE X0 SAME");
+
+        // Unity reference. A cloned histogram drawn with "HIST L" joins BIN CENTRES, so it stopped
+        // half a bin short of each end of the axis; a TLine spans the plotted range edge to edge.
+        TLine *ref1 = new TLine(r_btag->GetXaxis()->GetBinLowEdge(b1), 1.,
+                                r_btag->GetXaxis()->GetBinUpEdge(b2),  1.);
+        ref1->SetLineColor(kGray+2); ref1->SetLineStyle(2); ref1->SetLineWidth(1);
+        ref1->Draw("same");
+
+        // labels for the three isolated corrections (colours match the added stage above)
+        TLegend *lg_r = new TLegend(0.15, 0.84, 0.95, 0.99);
+        lg_r->SetNColumns(3);
+        lg_r->SetFillStyle(0); lg_r->SetBorderSize(0); lg_r->SetMargin(0.12);
+        lg_r->SetTextFont(font_code); lg_r->SetTextSize(legend_size * 0.8);
+        lg_r->AddEntry(r_btag, "b-tag", "pe1");
+        lg_r->AddEntry(r_2sv,  "+2SV",  "pe1");
+        lg_r->AddEntry(r_eec,  "+EEC weight", "pe1");
+        lg_r->Draw();
+        pad_ratio->RedrawAxis();
+
+        // Suffix so the normalised and absolute versions do not overwrite each other.
+        TString cmp_stem = folder + "correction_stages" + label + Form("_pt%d", ibin_pt)
+                         + (normalise_corr_stages ? "_norm" : "");
+        c_cmp->Print(cmp_stem + ".pdf");
+        c_cmp->Print(cmp_stem + ".png");
+    }
+
+
+    // ---- DEBUG: reco SV pt vs gen B pt, to explain the size of the EEC-weight correction ----
+    if (test_mode == 2) {
+        TH2D *h_svpt = getOrWarn<TH2D>(fin_unfolding, "h_svpt_vs_bpt");
+        TH1D *h_ptr  = getOrWarn<TH1D>(fin_unfolding, "h_ptratio");
+        if (h_svpt) {
+            std::cout << "\t---->Making DEBUG reco-vs-gen pt plot" << std::endl;
+            gStyle->SetPalette(kViridis);
+            TCanvas *c_dbg = new TCanvas("c_debug_svpt", "", 850, 700);
+            c_dbg->SetLeftMargin(0.13); c_dbg->SetRightMargin(0.18); c_dbg->SetTicks(1, 1);
+            h_svpt->SetStats(0);
+            h_svpt->SetTitle(";gen partial-B p_{T} [GeV];reco SV p_{T} [GeV];weighted entries");
+            h_svpt->GetXaxis()->SetTitleFont(font_code); h_svpt->GetXaxis()->SetTitleSize(title_size); h_svpt->GetXaxis()->SetTitleOffset(1.2);
+            h_svpt->GetXaxis()->SetLabelFont(font_code); h_svpt->GetXaxis()->SetLabelSize(label_size);
+            h_svpt->GetYaxis()->SetTitleFont(font_code); h_svpt->GetYaxis()->SetTitleSize(title_size); h_svpt->GetYaxis()->SetTitleOffset(1.5);
+            h_svpt->GetYaxis()->SetLabelFont(font_code); h_svpt->GetYaxis()->SetLabelSize(label_size);
+            h_svpt->GetZaxis()->SetTitleFont(font_code); h_svpt->GetZaxis()->SetTitleSize(title_size); h_svpt->GetZaxis()->SetTitleOffset(1.4);
+            h_svpt->GetZaxis()->SetLabelFont(font_code); h_svpt->GetZaxis()->SetLabelSize(label_size);
+            h_svpt->Draw("COLZ");
+            // mean reco/gen pt on an opaque white box (readable over the colour map)
+            if (h_ptr) {
+                TLegend *lg_d = new TLegend(0.16, 0.80, 0.50, 0.87);
+                lg_d->SetFillColor(kWhite); lg_d->SetFillStyle(1001); lg_d->SetBorderSize(1);
+                lg_d->SetTextFont(font_code); lg_d->SetTextSize(legend_size * 0.75);
+                lg_d->AddEntry((TObject*)0, Form("#LTp_{T}^{reco}/p_{T}^{gen}#GT = %.2f", h_ptr->GetMean()), "");
+                lg_d->Draw();
+            }
+            // CMS Internal above the top axis
+            TLatex cmsd; cmsd.SetNDC();
+            cmsd.SetTextFont(62); cmsd.SetTextSize(0.042); cmsd.DrawLatex(0.13, 0.945, "CMS");
+            cmsd.SetTextFont(52); cmsd.SetTextSize(0.034); cmsd.DrawLatex(0.235, 0.945, "Internal");
+            c_dbg->Print(folder + "debug_svpt_vs_bpt" + label + ".pdf");
+            c_dbg->Print(folder + "debug_svpt_vs_bpt" + label + ".png");
+        }
+    }
 
 
     // ---- Graphical bottomline test
@@ -356,7 +671,11 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
         leg->SetMargin(0.15);
         leg->SetTextFont(font_code);
         leg->SetTextSize(legend_size);
-        leg->SetHeader(Form("%.0f < p_{T}^{jet} < %.0f GeV", pt_min_plot, pt_max_plot));
+        // The last pT bin is open-ended (jets above jtpt_max are folded into it by
+        // jtpt_fill()), so quote it as a threshold rather than a closed range.
+        leg->SetHeader(pt_max_plot == jtpt_max
+                       ? Form("p_{T}^{jet} > %.0f GeV", pt_min_plot)
+                       : Form("%.0f < p_{T}^{jet} < %.0f GeV", pt_min_plot, pt_max_plot));
 
         // Name every curve by what it is and, in the split test, which half it came from.
         TString lbl_reco     = split_test ? "Reco pseudodata"  : "Reco data";
@@ -479,12 +798,22 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
         test_info_text->DrawLatex(0.57, 0.70, "2D unfolding");
         if(unfoldBayes) {
             test_info_text->DrawLatex(0.57, 0.65, "Bayesian unfolding");
-            test_info_text->DrawLatex(0.57, 0.60, Form("N iter = %d", scan_niter ? iter + 1 : 4));
+            test_info_text->DrawLatex(0.57, 0.60, Form("N iter = %d", niter_now));
+            // Refolding GoF of THIS iteration, so every scan page carries its own number.
+            test_info_text->DrawLatex(0.57, 0.55,
+                Form("refold #chi^{2}/ndf = %.2f", gof_all.chi2ndf()));
+            test_info_text->DrawLatex(0.57, 0.50, Form("p = %.3f", gof_all.pvalue));
         }
         else {
             test_info_text->DrawLatex(0.57, 0.65, "Matrix inversion unfolding");
         }
         //drawHeader();
+
+        // CMS Internal above the top axis (outside the frame)
+        TLatex cms_bl; cms_bl.SetNDC();
+        cms_bl.SetTextFont(62); cms_bl.SetTextSize(0.042); cms_bl.DrawLatex(0.10, 0.945, "CMS");
+        cms_bl.SetTextFont(52); cms_bl.SetTextSize(0.034); cms_bl.DrawLatex(0.205, 0.945, "Internal");
+        cms_bl.SetTextFont(42); cms_bl.SetTextSize(0.034); cms_bl.DrawLatex(0.66, 0.945, "pp #sqrt{s} = 5.36 TeV");
 
         pad_main->RedrawAxis();
 
@@ -697,17 +1026,195 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
     }   // end loop over iteration counts
     gErrorIgnoreLevel = prev_ignore;
 
+    // ---- Regularisation: pick the number of iterations from the refolding test ------------
+    // p-value of the refolded-vs-input comparison as a function of the iteration number.
+    // Expected behaviour: monotonic convergence -- p rises with niter as the nonclosure
+    // shrinks, then saturates as the refolded distribution overfits the input. The optimal
+    // iteration is the first one that is statistically compatible with the input, i.e. the
+    // smallest niter with p >= pvalue_threshold: going further buys no goodness of fit and
+    // only feeds fluctuations back through the prior.
+    if (unfoldBayes && v_niter.size() > 1) {
+
+        auto firstAbove = [&](const std::vector<double> &p) -> int {
+            for (size_t i = 0; i < p.size(); ++i)
+                if (p[i] >= pvalue_threshold) return (int) v_niter[i];
+            return -1;   // never reaches the threshold within the scanned range
+        };
+        const int best_all = firstAbove(v_pvalue_all);
+        const int best_pt  = firstAbove(v_pvalue_pt);
+
+        // Secondary diagnostic. With a well-conditioned response the p-value can already clear
+        // the threshold at the first iteration, which makes the criterion above degenerate;
+        // chi2/ndf still says where the refolding stops closing and starts over-describing the
+        // input (chi2/ndf falling well below 1 = the refolded distribution is tracking the
+        // input's own fluctuations).
+        auto closestToOne = [&](const std::vector<double> &c) -> int {
+            int best = -1; double dmin = 1e30;
+            for (size_t i = 0; i < c.size(); ++i) {
+                if (c[i] <= 0.) continue;
+                const double d = std::fabs(c[i] - 1.);
+                if (d < dmin) { dmin = d; best = (int) v_niter[i]; }
+            }
+            return best;
+        };
+        const int c2one_all = closestToOne(v_chi2ndf_all);
+
+        std::cout << "\n================ Refolding goodness-of-fit scan ================\n"
+                  << "  input   : h_data_purity_corrected (reconstructed level)\n"
+                  << "  refolded: response->ApplyToTruth(unfolded)\n"
+                  << Form("  criterion: smallest niter with p >= %.3f\n", pvalue_threshold);
+        std::cout << Form("  %6s  %12s %10s   %12s %10s\n",
+                          "niter", "chi2/ndf 2D", "p 2D", "chi2/ndf pT", "p pT");
+        for (size_t i = 0; i < v_niter.size(); ++i)
+            std::cout << Form("  %6.0f  %12.3f %10.3e   %12.3f %10.3e\n",
+                              v_niter[i], v_chi2ndf_all[i], v_pvalue_all[i],
+                              v_chi2ndf_pt[i], v_pvalue_pt[i]);
+        std::cout << Form("  ----> optimal niter (full 2D reco space) = %d\n", best_all)
+                  << Form("  ----> optimal niter (pT bin %d only)      = %d\n", ibin_pt, best_pt)
+                  << Form("  ----> cross-check, chi2/ndf closest to 1 = %d\n", c2one_all)
+                  << "================================================================\n"
+                  << std::endl;
+
+        const int np = (int) v_niter.size();
+        TGraph *g_p_all    = new TGraph(np, v_niter.data(), v_pvalue_all.data());
+        TGraph *g_p_pt     = new TGraph(np, v_niter.data(), v_pvalue_pt.data());
+        TGraph *g_c2_all   = new TGraph(np, v_niter.data(), v_chi2ndf_all.data());
+        TGraph *g_c2_pt    = new TGraph(np, v_niter.data(), v_chi2ndf_pt.data());
+        g_p_all ->SetLineColor(blue);   g_p_all ->SetMarkerColor(blue);   g_p_all ->SetMarkerStyle(kFullCircle);
+        g_p_pt  ->SetLineColor(orange); g_p_pt  ->SetMarkerColor(orange); g_p_pt  ->SetMarkerStyle(kOpenSquare);
+        g_c2_all->SetLineColor(blue);   g_c2_all->SetMarkerColor(blue);   g_c2_all->SetMarkerStyle(kFullCircle);
+        g_c2_pt ->SetLineColor(orange); g_c2_pt ->SetMarkerColor(orange); g_c2_pt ->SetMarkerStyle(kOpenSquare);
+        for (TGraph *g : {g_p_all, g_p_pt, g_c2_all, g_c2_pt}) { g->SetLineWidth(2); g->SetMarkerSize(0.9); }
+
+        const double x_lo_it = v_niter.front() - 0.5;
+        const double x_hi_it = v_niter.back()  + 0.5;
+
+        TCanvas *c_reg = new TCanvas("c_regularisation", "", 800, 800);
+        TPad *pad_p  = new TPad("pad_reg_p",  "", 0., 0.42, 1., 1.);
+        TPad *pad_c2 = new TPad("pad_reg_c2", "", 0., 0.,   1., 0.42);
+        for (TPad *p : {pad_p, pad_c2}) { p->SetTicks(1, 1); p->SetFillColor(0); }
+        pad_p ->SetMargin(0.13, 0.05, 0.00, 0.08);
+        pad_c2->SetMargin(0.13, 0.05, 0.22, 0.00);
+        c_reg->cd(); pad_p->Draw(); pad_c2->Draw();
+
+        // ---- top: p-value vs iteration, full 2D reco space only (the space that was unfolded,
+        // and the one the selected iteration is taken from). Log y: the first iterations sit
+        // many orders of magnitude below the threshold, and the approach to it has to be readable.
+        pad_p->cd();
+        //pad_p->SetLogy();
+        double p_min = 1.;
+        for (double p : v_pvalue_all) if (p > 0.) p_min = std::min(p_min, p);
+        // One whole decade below the smallest p, so (a) the first iterations stay inside the
+        // frame -- with 20 iterations the first p can be ~1e-17 -- and (b) the lowest labelled
+        // decade sits one step above the frame edge instead of being clipped by it.
+        const double y_lo_p = std::max(std::pow(10., std::floor(std::log10(p_min)) - 1.), 1e-30);
+        const double y_hi_p = 1.05;  // p is bounded by 1; just enough headroom to clear the curve
+        TH1F *fr_p = pad_p->DrawFrame(x_lo_it, y_lo_p, x_hi_it, y_hi_p);
+        fr_p->GetYaxis()->SetTitle("p-value");
+        fr_p->GetYaxis()->CenterTitle(true);
+        fr_p->GetYaxis()->SetTitleFont(font_code); fr_p->GetYaxis()->SetTitleSize(title_size); fr_p->GetYaxis()->SetTitleOffset(1.5);
+        fr_p->GetYaxis()->SetLabelFont(font_code); fr_p->GetYaxis()->SetLabelSize(label_size);
+        // Label only every few decades: over ~10 decades one label per power of ten is unreadable.
+        // On a log axis the primary-division count is how many decades ROOT puts between labels.
+        fr_p->GetYaxis()->SetNdivisions(506);
+        // The two pads share an edge, and this pad's LOWEST y label sits exactly on it, so it
+        // gets clipped in half (and would collide with the bottom pad's highest label anyway).
+        // Hide it: size 0. labNum = 1 is the first (lowest) label.
+        fr_p->GetYaxis()->ChangeLabel(1, -1, 0.);
+        fr_p->GetXaxis()->SetLabelSize(0); fr_p->GetXaxis()->SetTitleSize(0);  // x belongs to the bottom pad
+        g_p_all->Draw("PL SAME");
+
+        TLine *l_thr = new TLine(x_lo_it, pvalue_threshold, x_hi_it, pvalue_threshold);
+        l_thr->SetLineColor(kGray + 2); l_thr->SetLineStyle(2); l_thr->Draw("same");
+        // Vertical marker at the chosen iteration. TLine takes user coordinates, which on a
+        // log pad are the values themselves (not their logs), so the frame range is what to use.
+        if (best_all > 0) {
+            TLine *l_best = new TLine(best_all, y_lo_p, best_all, y_hi_p);
+            l_best->SetLineColor(red); l_best->SetLineStyle(7); l_best->SetLineWidth(2);
+            l_best->Draw("same");
+        }
+        // With a single curve a legend is noise; label the threshold line where it sits instead.
+        // User coordinates (not NDC) so the label tracks the line, at the right-hand end where
+        // the curve has already saturated near 1 and cannot collide with the text. Which side of
+        // the line has room depends on the scale: on log y there are decades below 0.05 to sit in,
+        // on linear y that space is a sliver against the frame edge, so go above the line instead.
+        TLatex tx_thr;
+        tx_thr.SetTextFont(font_code); tx_thr.SetTextSize(label_size); tx_thr.SetTextColor(kGray + 2);
+        tx_thr.DrawLatex(x_hi_it - 0.25 * (x_hi_it - x_lo_it),
+                         pad_p->GetLogy() ? pvalue_threshold / 8.
+                                          : pvalue_threshold + 0.04 * (y_hi_p - y_lo_p),
+                         Form("p = %.2f", pvalue_threshold));
+
+        TLatex tx_reg; tx_reg.SetNDC();
+        tx_reg.SetTextFont(font_code); tx_reg.SetTextSize(label_size);
+        // Right of the rise, in the empty band under the saturated curve: on the left the text
+        // sits on top of the part of the curve the plot is about.
+        tx_reg.DrawLatex(0.45, 0.30,
+            test_mode == 0 ? "MC full-sample closure" :
+            test_mode == 1 ? "MC split closure test"  : "Data Run 3");
+        tx_reg.DrawLatex(0.45, 0.24, "D'Agostini, early stopping");
+        tx_reg.DrawLatex(0.45, 0.18, best_all > 0 ? Form("optimal N iter = %d", best_all)
+                                                  : "no iteration reaches the threshold");
+        TLatex cms_reg; cms_reg.SetNDC();
+        cms_reg.SetTextFont(62); cms_reg.SetTextSize(0.042); cms_reg.DrawLatex(0.13, 0.945, "CMS");
+        cms_reg.SetTextFont(52); cms_reg.SetTextSize(0.034); cms_reg.DrawLatex(0.205, 0.945, "Internal");
+        cms_reg.SetTextFont(42); cms_reg.SetTextSize(0.034); cms_reg.DrawLatex(0.66, 0.945, "pp #sqrt{s} = 5.36 TeV");
+        pad_p->RedrawAxis();
+
+        // ---- bottom: the same information as chi2/ndf, where 1 is the target
+        pad_c2->cd();
+        pad_c2->SetLogy();
+        double c2_max = 1., c2_min = 1.;
+        for (double c : v_chi2ndf_all) if (c > 0.) { c2_max = std::max(c2_max, c); c2_min = std::min(c2_min, c); }
+        TH1F *fr_c2 = pad_c2->DrawFrame(x_lo_it, c2_min * 0.5, x_hi_it, c2_max * 2.);
+        fr_c2->GetYaxis()->SetTitle("#chi^{2}/ndf");
+        fr_c2->GetYaxis()->CenterTitle(true);
+        fr_c2->GetYaxis()->SetTitleFont(font_code); fr_c2->GetYaxis()->SetTitleSize(title_size); fr_c2->GetYaxis()->SetTitleOffset(1.5);
+        fr_c2->GetYaxis()->SetLabelFont(font_code); fr_c2->GetYaxis()->SetLabelSize(label_size);
+        // Same shared edge from the other side: hide this pad's HIGHEST y label (labNum = -1).
+        fr_c2->GetYaxis()->ChangeLabel(-1, -1, 0.);
+        fr_c2->GetXaxis()->SetTitle("number of iterations");
+        fr_c2->GetXaxis()->CenterTitle(true);
+        // Offset in precision-43 fonts scales off the (short) pad height: anything near 2 puts
+        // the title off the canvas entirely. 1.3 lands it just below the tick labels.
+        fr_c2->GetXaxis()->SetTitleFont(font_code); fr_c2->GetXaxis()->SetTitleSize(title_size); fr_c2->GetXaxis()->SetTitleOffset(1.3);
+        fr_c2->GetXaxis()->SetLabelFont(font_code); fr_c2->GetXaxis()->SetLabelSize(label_size);
+        g_c2_all->Draw("PL SAME");
+        TLine *l_one = new TLine(x_lo_it, 1., x_hi_it, 1.);
+        l_one->SetLineColor(kGray + 2); l_one->SetLineStyle(2); l_one->Draw("same");
+        pad_c2->RedrawAxis();
+
+        // Next to the per-iteration scan outputs, which this plot summarises.
+        TString reg_stem = home_llr + "refolding_pvalue_vs_iteration_" + label;
+        c_reg->Print(reg_stem + ".pdf");
+        c_reg->Print(reg_stem + ".png");
+
+        // Keep the scan itself, so the choice can be re-plotted without re-unfolding.
+        TFile *f_reg = new TFile(reg_stem + ".root", "recreate");
+        g_p_all ->Write("g_pvalue_vs_niter_2D");
+        g_p_pt  ->Write(Form("g_pvalue_vs_niter_pt%d", ibin_pt));
+        g_c2_all->Write("g_chi2ndf_vs_niter_2D");
+        g_c2_pt ->Write(Form("g_chi2ndf_vs_niter_pt%d", ibin_pt));
+        f_reg->Close();
+        delete f_reg;
+        std::cout << "Wrote regularisation scan to " << reg_stem << ".{pdf,png,root}" << std::endl;
+    }
+
     // gApplication -> Terminate(0);
 }
 
-// test_mode: 0 = full-MC closure, 1 = split test, 2 = data
+// test_mode:   0 = full-MC closure, 1 = split test, 2 = data
 // unfoldBayes: true = Bayesian, false = matrix inversion
-void apply_unfolding_2d(int test_mode = 1, bool unfoldBayes = true){
+// scan_niter:  true = scan niter = 1..100 and pick the optimal one from the refolding
+//              goodness-of-fit test; false = one unfolding at the nominal niter = 4.
+//              Bayesian only -- matrix inversion has no iterations to scan.
+// e.g.  root -l 'apply_unfolding_2d.C(2, true, true)'   // data, Bayesian, scan the iterations
+void apply_unfolding_2d(int test_mode = 2, bool unfoldBayes = true, bool scan_niter = false){
     TString dataset = "data";
     TString folder = "/data_CMS/cms/zaidan/analysis_lise/Run3/";
-    TString pT_selection = "80_200";
+    TString pT_selection = "80_inf";
     bool btag = true;
     Int_t n = 1;
-	apply_unfolding(dataset, folder, btag, n, pT_selection, test_mode, unfoldBayes);
+	apply_unfolding(dataset, folder, btag, n, pT_selection, test_mode, unfoldBayes, scan_niter);
 
 }
