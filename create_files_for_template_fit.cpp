@@ -2209,7 +2209,9 @@ void Build_templates(const AnalysisConfig& cfg, bool isMakeTemplates = true, boo
 	        }
 	      }
 	    if (aggBHadronTree) aggBHadronTree->Fill();
-	    if (!isCreateRmatrix) continue;
+	    // Diagnostic ntuples may contain data and all MC jet flavors.  The response,
+	    // purity, and efficiency definitions below remain restricted to truth bb jets.
+	    if (!isCreateRmatrix || !cfg.dataset.isMC || t.jtNbHad[ijet] < 2) continue;
 
 	    // Combined SV-reco + b-tag efficiency: DENOMINATOR = all true 2b jets, filled
 	    // BEFORE the 2-SV cut. Gen-EEC weighted (eec_gen exists for every gen_ok jet,
