@@ -1746,9 +1746,6 @@ void Build_templates(const AnalysisConfig& cfg, bool isMakeTemplates = true, boo
 	// -- For b-tagging eff. correction after unfolding (at particle level)
 	TH2D* hgenjet_2b = new TH2D("hgenjet_2b", "b-tagging eff. DENO;m_{2B} [GeV];DeltaR;p_{T} [GeV]", n_dr, dr_binsVector, n_pt, jtpt_binsVector); // before btagging
 	TH2D* hgenjet_2b_passbtag = new TH2D("hgenjet_2b_passbtag", "b-tagging eff. NUM;m_{2B} [GeV];DeltaR;p_{T} [GeV]",  n_dr, dr_binsVector, n_pt, jtpt_binsVector); // after btagging
-<<<<<<< HEAD
-	const bool doAggNtuple = makeAggNtuple;
-=======
 
 	// Combined SV-reconstruction + b-tag efficiency. Gen-EEC weighted (w_gen) so the
 	// denominator is defined even for true 2b jets that never get 2 reco SVs.
@@ -1761,8 +1758,7 @@ void Build_templates(const AnalysisConfig& cfg, bool isMakeTemplates = true, boo
 	TH1D* h_ptratio     = new TH1D("h_ptratio", "reco/gen SV p_{T};p_{T}^{reco}/p_{T}^{gen};entries", 60, 0., 2.);
 	h_svpt_vs_bpt->Sumw2();
 	h_ptratio->Sumw2();
-	const bool doAggNtuple = makeAggNtuple && cfg.dataset.isMC;
->>>>>>> origin/main
+	const bool doAggNtuple = makeAggNtuple;
 	TFile* fout_agg = nullptr;
 	TTree* aggBHadronTree = nullptr;
 	AggBHadronNtupleRow aggRow;
@@ -2018,21 +2014,15 @@ void Build_templates(const AnalysisConfig& cfg, bool isMakeTemplates = true, boo
               } // end if 2 SV 
 
 
-	    /////////---- To Prepare Response matrix (MC truth) and/or diagnostic agg ntuple (data+MC) ----
-		          if((cfg.dataset.isMC && isCreateRmatrix && t.jtNbHad[ijet] >= 2) || doAggNtuple)
-	          { 
+    /////////---- Response matrix (MC truth) and/or diagnostic agg ntuple (data+MC) ----
+	          if ((cfg.dataset.isMC && isCreateRmatrix && t.jtNbHad[ijet] >= 2) || doAggNtuple)
+          { 
 
-<<<<<<< HEAD
-            // -- common variables repeatdly used in fill histograms 
-            double jpt_reco = reco_jet_pt(t, ijet);
-            double jpt_gen = cfg.dataset.isMC ? gen_jet_pt(t, ijet) : -999.0;
-=======
             // -- common variables repeatdly used in fill histograms
             // jtpt_fill() folds jets above the last bin edge into that bin, so they are
             // not lost to the overflow bin (see binning_histos_small.h).
             double jpt_reco = jtpt_fill(reco_jet_pt(t, ijet));
-            double jpt_gen = jtpt_fill(gen_jet_pt(t, ijet));
->>>>>>> origin/main
+            double jpt_gen = cfg.dataset.isMC ? jtpt_fill(gen_jet_pt(t, ijet)) : -999.0;
             double jeta_reco = reco_jet_eta(t, ijet);
             double jeta_gen = cfg.dataset.isMC ? gen_jet_eta(t, ijet) : -999.0;
             // -- for cout only
@@ -2044,7 +2034,7 @@ void Build_templates(const AnalysisConfig& cfg, bool isMakeTemplates = true, boo
 	                                  -1);
 
 		            // -- counts stats
-		            if (cfg.dataset.isMC && t.jtNbHad[ijet] >= 2) n_bb_jets++; // true >=2b jets 
+		            if (cfg.dataset.isMC && t.jtNbHad[ijet] >= 2) n_bb_jets++; // true >=2b jets
 
                 double row_weight = weight_tree;
                 if (cfg.dataset.RunN == 3 && !cfg.dataset.isMC &&
@@ -2084,147 +2074,7 @@ void Build_templates(const AnalysisConfig& cfg, bool isMakeTemplates = true, boo
 	                // step1: for Response matrix ---- Gen b hadrons ----
 	                std::vector<ROOT::Math::PtEtaPhiMVector> gen_bh;
 	                std::vector<Int_t> gen_bh_sta;
-<<<<<<< HEAD
 	                if (cfg.dataset.isMC) PartialBsAggregation(gen_bh, gen_bh_sta, t, ijet);
-		                aggRow.nGenAgg = gen_bh.size();
-		                const bool has_gen_pair = cfg.dataset.isMC && (gen_bh.size() >= 2);
-		                if (has_gen_pair) n_gen_bh_ok++;
-
-	                double eec_gen = -1, mB_gen = -1, dr_gen = -1;
-	                double mB_gen_fill = -1, dr_gen_fill = -1;
-	                double w_gen = 0;
-	                if (has_gen_pair) {
-	                  // From aggregated gen B: Pick gen pair with largest EEC weight (pt_i * pt_j)^n
-	                  int best_i = 0, best_j = 1;
-	                  double best_pt_prod = -1;
-	                  for (size_t gi = 0; gi < gen_bh.size(); gi++)
-	                      for (size_t gj = gi+1; gj < gen_bh.size(); gj++) {
-	                          double pp = gen_bh[gi].Pt() * gen_bh[gj].Pt();
-	                          if (pp > best_pt_prod) { best_pt_prod = pp; best_i = gi; best_j = gj; }
-	                  }
-					          // gen pair info
-		                  eec_gen = std::pow(gen_bh[best_i].Pt() * gen_bh[best_j].Pt(), cfg.n);
-		                  mB_gen  = gen_bh[best_i].M() + gen_bh[best_j].M();
-		                  dr_gen  = t.calc_dr(gen_bh[best_i].Eta(), gen_bh[best_i].Phi(),
-		                                             gen_bh[best_j].Eta(), gen_bh[best_j].Phi());
-		                  aggRow.genStatus1 = gen_bh_sta[best_i];
-		                  aggRow.genStatus2 = gen_bh_sta[best_j];
-		                  aggRow.genPt1 = gen_bh[best_i].Pt();
-		                  aggRow.genEta1 = gen_bh[best_i].Eta();
-		                  aggRow.genPhi1 = gen_bh[best_i].Phi();
-		                  aggRow.genM1 = gen_bh[best_i].M();
-		                  aggRow.genPt2 = gen_bh[best_j].Pt();
-		                  aggRow.genEta2 = gen_bh[best_j].Eta();
-		                  aggRow.genPhi2 = gen_bh[best_j].Phi();
-		                  aggRow.genM2 = gen_bh[best_j].M();
-		                  aggRow.genDr = dr_gen;
-		                  aggRow.genMB = mB_gen;
-		                  aggRow.genEec = eec_gen;
-		                  aggRow.genHasMatchedSv1 = statusHasMatchedSv(t, ijet, aggRow.genStatus1);
-		                  aggRow.genHasMatchedSv2 = statusHasMatchedSv(t, ijet, aggRow.genStatus2);
-		                  for (Int_t ifullB = 0; ifullB < t.nfullB; ++ifullB) {
-		                    if (t.fullBJetId[ifullB] != ijet) continue;
-		                    if (t.fullBSta[ifullB] == aggRow.genStatus1) {
-		                      aggRow.fullBStatus1 = t.fullBSta[ifullB];
-		                      aggRow.fullBPt1 = t.fullBPt[ifullB];
-		                      aggRow.fullBEta1 = t.fullBEta[ifullB];
-		                      aggRow.fullBPhi1 = t.fullBPhi[ifullB];
-		                      aggRow.fullBJetDr1 = t.calc_dr(t.fullBEta[ifullB], t.fullBPhi[ifullB],
-		                                                      jeta_reco, t.jtphi[ijet]);
-		                      aggRow.fullBHasMatchedSv1 = statusHasMatchedSv(t, ijet, t.fullBSta[ifullB]);
-		                    }
-		                    if (t.fullBSta[ifullB] == aggRow.genStatus2) {
-		                      aggRow.fullBStatus2 = t.fullBSta[ifullB];
-		                      aggRow.fullBPt2 = t.fullBPt[ifullB];
-		                      aggRow.fullBEta2 = t.fullBEta[ifullB];
-		                      aggRow.fullBPhi2 = t.fullBPhi[ifullB];
-		                      aggRow.fullBJetDr2 = t.calc_dr(t.fullBEta[ifullB], t.fullBPhi[ifullB],
-		                                                      jeta_reco, t.jtphi[ijet]);
-		                      aggRow.fullBHasMatchedSv2 = statusHasMatchedSv(t, ijet, t.fullBSta[ifullB]);
-		                    }
-		                  }
-					  // overflow treatement at gen level	
-				      mB_gen_fill = mB_gen;
-				      dr_gen_fill = dr_gen;
-                  if (mB_gen_fill >= mb_max) mB_gen_fill = mb_max_fill;
-                  if (dr_gen_fill >= dr_max)  dr_gen_fill = dr_max_fill;
-
-					  // -- Gen EEC weight
-					  w_gen  = weight_tree * eec_gen;
-			
-				     // Fill total number of True 2b Jets (Deno of b-tagging eff. correction) before b-tagger: simialr axis to what we unfold to. - used after unfolding
-				     if (t.jtNbHad[ijet] >= 2) hgenjet_2b ->Fill(dr_gen, jpt_gen, w_gen);
-	                }
-			   
-			   // -- Prepare combined b-tagger: 
-               // ---- Reco SVs ----
-                std::vector<int> reco_sv_status_rm;
-                std::vector<RecoSvTruthComposition> reco_sv_composition_rm;
-                vector<ROOT::Math::PtEtaPhiMVector> reco_sv_rm =
-                  makeSvtxs_withBDT(t, ijet, ient, agg_fail_rm, nb_sv_rm, sv_fail_rm, merge_fail_rm,
-                                    nullptr, nullptr,
-                                    cfg.dataset.isMC ? &reco_sv_status_rm : nullptr,
-                                    cfg.dataset.isMC ? &reco_sv_composition_rm : nullptr);
-				  
-	                bool reco_sv_ok = (reco_sv_rm.size() == 2);
-	                aggRow.nRecoAgg = reco_sv_rm.size();
-	                if (reco_sv_ok) {
-	                  const double mB_reco_diag = reco_sv_rm[0].M() + reco_sv_rm[1].M();
-	                  const double dr_reco_diag = t.calc_dr(reco_sv_rm[0].Eta(), reco_sv_rm[0].Phi(),
-	                                                        reco_sv_rm[1].Eta(), reco_sv_rm[1].Phi());
-	                  const double eec_reco_diag =
-	                      std::pow(reco_sv_rm[0].Pt() * reco_sv_rm[1].Pt(), cfg.n);
-	                  aggRow.recoPt1 = reco_sv_rm[0].Pt();
-	                  aggRow.recoEta1 = reco_sv_rm[0].Eta();
-	                  aggRow.recoPhi1 = reco_sv_rm[0].Phi();
-	                  aggRow.recoM1 = reco_sv_rm[0].M();
-	                  aggRow.recoPt2 = reco_sv_rm[1].Pt();
-	                  aggRow.recoEta2 = reco_sv_rm[1].Eta();
-	                  aggRow.recoPhi2 = reco_sv_rm[1].Phi();
-	                  aggRow.recoM2 = reco_sv_rm[1].M();
-	                  aggRow.recoDr = dr_reco_diag;
-	                  aggRow.recoMB = mB_reco_diag;
-	                  aggRow.recoEec = eec_reco_diag;
-	                  if (cfg.dataset.isMC && reco_sv_status_rm.size() > 0) {
-	                    aggRow.recoStatus1 = reco_sv_status_rm[0];
-	                    aggRow.recoStatusHasMatchedSv1 = statusHasMatchedSv(t, ijet, aggRow.recoStatus1);
-	                  }
-                  if (cfg.dataset.isMC && reco_sv_status_rm.size() > 1) {
-                    aggRow.recoStatus2 = reco_sv_status_rm[1];
-                    aggRow.recoStatusHasMatchedSv2 = statusHasMatchedSv(t, ijet, aggRow.recoStatus2);
-                  }
-                  if (cfg.dataset.isMC && reco_sv_composition_rm.size() > 0) {
-                    aggRow.recoSvNtrk1 = reco_sv_composition_rm[0].nTracks;
-                    aggRow.recoSvNHfTrk1 = reco_sv_composition_rm[0].nHfTracks;
-                    aggRow.recoSvTotalTrackPt1 = reco_sv_composition_rm[0].totalTrackPt;
-                    aggRow.recoSvHfTrackPt1 = reco_sv_composition_rm[0].hfTrackPt;
-                    aggRow.recoSvDominantStatusTrackPt1 = reco_sv_composition_rm[0].dominantStatusTrackPt;
-                    aggRow.recoSvHfTrackPurity1 = reco_sv_composition_rm[0].hfTrackPurity;
-                    aggRow.recoSvDominantStatusTrackPurity1 = reco_sv_composition_rm[0].dominantStatusTrackPurity;
-                    aggRow.recoSvHfPtPurity1 = reco_sv_composition_rm[0].hfPtPurity;
-                    aggRow.recoSvDominantStatusPtPurity1 = reco_sv_composition_rm[0].dominantStatusPtPurity;
-                    aggRow.recoSvDominantStatusPtOverHfPt1 = reco_sv_composition_rm[0].dominantStatusPtOverHfPt;
-                  }
-                  if (cfg.dataset.isMC && reco_sv_composition_rm.size() > 1) {
-                    aggRow.recoSvNtrk2 = reco_sv_composition_rm[1].nTracks;
-                    aggRow.recoSvNHfTrk2 = reco_sv_composition_rm[1].nHfTracks;
-                    aggRow.recoSvTotalTrackPt2 = reco_sv_composition_rm[1].totalTrackPt;
-                    aggRow.recoSvHfTrackPt2 = reco_sv_composition_rm[1].hfTrackPt;
-                    aggRow.recoSvDominantStatusTrackPt2 = reco_sv_composition_rm[1].dominantStatusTrackPt;
-                    aggRow.recoSvHfTrackPurity2 = reco_sv_composition_rm[1].hfTrackPurity;
-                    aggRow.recoSvDominantStatusTrackPurity2 = reco_sv_composition_rm[1].dominantStatusTrackPurity;
-                    aggRow.recoSvHfPtPurity2 = reco_sv_composition_rm[1].hfPtPurity;
-                    aggRow.recoSvDominantStatusPtPurity2 = reco_sv_composition_rm[1].dominantStatusPtPurity;
-                    aggRow.recoSvDominantStatusPtOverHfPt2 = reco_sv_composition_rm[1].dominantStatusPtOverHfPt;
-                  }
-                  }
-		                if (aggBHadronTree) aggBHadronTree->Fill();
-		                if (!isCreateRmatrix || !has_gen_pair || t.jtNbHad[ijet] < 2) continue;
-				   
-				   // -- Use combined b-tagger: Upart tagger + 2SV of aggreagted Bs., for Rmatrix unfolding, purity, reconstruction eff. 
-					if (!reco_sv_ok  || !passBtag(t, ijet, cfg)) continue; // select btagged jets only
-=======
-	                PartialBsAggregation(gen_bh, gen_bh_sta, t, ijet);
 	                aggRow.nGenAgg = gen_bh.size();
 	                // MEASUREMENT DEFINITION: "bb with a well-defined 2-gen-B observable;
 	                // rest are fakes". A reco jet with < 2 aggregatable gen B-hadrons has a
@@ -2267,16 +2117,44 @@ void Build_templates(const AnalysisConfig& cfg, bool isMakeTemplates = true, boo
 	                aggRow.genDr = dr_gen;
 	                aggRow.genMB = mB_gen;
 	                aggRow.genEec = eec_gen;
+	                aggRow.genHasMatchedSv1 = statusHasMatchedSv(t, ijet, aggRow.genStatus1);
+	                aggRow.genHasMatchedSv2 = statusHasMatchedSv(t, ijet, aggRow.genStatus2);
+	                for (Int_t ifullB = 0; ifullB < t.nfullB; ++ifullB) {
+	                  if (t.fullBJetId[ifullB] != ijet) continue;
+	                  if (t.fullBSta[ifullB] == aggRow.genStatus1) {
+	                    aggRow.fullBStatus1 = t.fullBSta[ifullB];
+	                    aggRow.fullBPt1 = t.fullBPt[ifullB];
+	                    aggRow.fullBEta1 = t.fullBEta[ifullB];
+	                    aggRow.fullBPhi1 = t.fullBPhi[ifullB];
+	                    aggRow.fullBJetDr1 = t.calc_dr(t.fullBEta[ifullB], t.fullBPhi[ifullB],
+	                                                    jeta_reco, t.jtphi[ijet]);
+	                    aggRow.fullBHasMatchedSv1 = statusHasMatchedSv(t, ijet, t.fullBSta[ifullB]);
+	                  }
+	                  if (t.fullBSta[ifullB] == aggRow.genStatus2) {
+	                    aggRow.fullBStatus2 = t.fullBSta[ifullB];
+	                    aggRow.fullBPt2 = t.fullBPt[ifullB];
+	                    aggRow.fullBEta2 = t.fullBEta[ifullB];
+	                    aggRow.fullBPhi2 = t.fullBPhi[ifullB];
+	                    aggRow.fullBJetDr2 = t.calc_dr(t.fullBEta[ifullB], t.fullBPhi[ifullB],
+	                                                    jeta_reco, t.jtphi[ijet]);
+	                    aggRow.fullBHasMatchedSv2 = statusHasMatchedSv(t, ijet, t.fullBSta[ifullB]);
+	                  }
+	                }
 					// overflow treatement at gen level	
 				    mB_gen_fill = mB_gen; dr_gen_fill = dr_gen;
                 if (mB_gen_fill >= mb_max) mB_gen_fill = mb_max_fill;
                 if (dr_gen_fill >= dr_max)  dr_gen_fill = dr_max_fill;
                 } // end if (gen_ok): gen-pair observables ready
->>>>>>> origin/main
 			  
 			  // -- Prepare combined b-tagger: 
         // ---- Reco SVs ----
-        vector<ROOT::Math::PtEtaPhiMVector> reco_sv_rm = makeSvtxs_withBDT(t, ijet, ient, agg_fail_rm, nb_sv_rm, sv_fail_rm, merge_fail_rm, nullptr, nullptr);
+        std::vector<int> reco_sv_status_rm;
+        std::vector<RecoSvTruthComposition> reco_sv_composition_rm;
+        vector<ROOT::Math::PtEtaPhiMVector> reco_sv_rm =
+            makeSvtxs_withBDT(t, ijet, ient, agg_fail_rm, nb_sv_rm, sv_fail_rm,
+                              merge_fail_rm, nullptr, nullptr,
+                              cfg.dataset.isMC ? &reco_sv_status_rm : nullptr,
+                              cfg.dataset.isMC ? &reco_sv_composition_rm : nullptr);
 				  
 	      bool reco_sv_ok = (reco_sv_rm.size() == 2);
 	      aggRow.nRecoAgg = reco_sv_rm.size();
@@ -2297,6 +2175,38 @@ void Build_templates(const AnalysisConfig& cfg, bool isMakeTemplates = true, boo
 	        aggRow.recoDr = dr_reco_diag;
 	        aggRow.recoMB = mB_reco_diag;
 	        aggRow.recoEec = eec_reco_diag;
+	        if (cfg.dataset.isMC && reco_sv_status_rm.size() > 0) {
+	          aggRow.recoStatus1 = reco_sv_status_rm[0];
+	          aggRow.recoStatusHasMatchedSv1 = statusHasMatchedSv(t, ijet, aggRow.recoStatus1);
+	        }
+	        if (cfg.dataset.isMC && reco_sv_status_rm.size() > 1) {
+	          aggRow.recoStatus2 = reco_sv_status_rm[1];
+	          aggRow.recoStatusHasMatchedSv2 = statusHasMatchedSv(t, ijet, aggRow.recoStatus2);
+	        }
+	        if (cfg.dataset.isMC && reco_sv_composition_rm.size() > 0) {
+	          aggRow.recoSvNtrk1 = reco_sv_composition_rm[0].nTracks;
+	          aggRow.recoSvNHfTrk1 = reco_sv_composition_rm[0].nHfTracks;
+	          aggRow.recoSvTotalTrackPt1 = reco_sv_composition_rm[0].totalTrackPt;
+	          aggRow.recoSvHfTrackPt1 = reco_sv_composition_rm[0].hfTrackPt;
+	          aggRow.recoSvDominantStatusTrackPt1 = reco_sv_composition_rm[0].dominantStatusTrackPt;
+	          aggRow.recoSvHfTrackPurity1 = reco_sv_composition_rm[0].hfTrackPurity;
+	          aggRow.recoSvDominantStatusTrackPurity1 = reco_sv_composition_rm[0].dominantStatusTrackPurity;
+	          aggRow.recoSvHfPtPurity1 = reco_sv_composition_rm[0].hfPtPurity;
+	          aggRow.recoSvDominantStatusPtPurity1 = reco_sv_composition_rm[0].dominantStatusPtPurity;
+	          aggRow.recoSvDominantStatusPtOverHfPt1 = reco_sv_composition_rm[0].dominantStatusPtOverHfPt;
+	        }
+	        if (cfg.dataset.isMC && reco_sv_composition_rm.size() > 1) {
+	          aggRow.recoSvNtrk2 = reco_sv_composition_rm[1].nTracks;
+	          aggRow.recoSvNHfTrk2 = reco_sv_composition_rm[1].nHfTracks;
+	          aggRow.recoSvTotalTrackPt2 = reco_sv_composition_rm[1].totalTrackPt;
+	          aggRow.recoSvHfTrackPt2 = reco_sv_composition_rm[1].hfTrackPt;
+	          aggRow.recoSvDominantStatusTrackPt2 = reco_sv_composition_rm[1].dominantStatusTrackPt;
+	          aggRow.recoSvHfTrackPurity2 = reco_sv_composition_rm[1].hfTrackPurity;
+	          aggRow.recoSvDominantStatusTrackPurity2 = reco_sv_composition_rm[1].dominantStatusTrackPurity;
+	          aggRow.recoSvHfPtPurity2 = reco_sv_composition_rm[1].hfPtPurity;
+	          aggRow.recoSvDominantStatusPtPurity2 = reco_sv_composition_rm[1].dominantStatusPtPurity;
+	          aggRow.recoSvDominantStatusPtOverHfPt2 = reco_sv_composition_rm[1].dominantStatusPtOverHfPt;
+	        }
 	      }
 	    if (aggBHadronTree) aggBHadronTree->Fill();
 	    if (!isCreateRmatrix) continue;
