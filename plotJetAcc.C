@@ -83,7 +83,7 @@ void plotJetAcc(){
   gStyle->SetNumberContours(255);
   gStyle->SetPaintTextFormat(".2f");
 
-  TFile *fin = new TFile("RMatrix_Run3_btagWP868_template_for_fit_histos_3D_qcd_f.root");
+  TFile *fin = new TFile("/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/RMatrix_Run3_btagWP868_template_for_fit_histos_3D_qcd_f.root");
 
   TH2D *hPur = makeRatioFromCounts(fin, "h_full_purity_tf_from_counts", "Purity",
                                    "h_full_purity_numerator_tf",
@@ -113,5 +113,11 @@ void plotJetAcc(){
   px->SetMarkerStyle(8);
   px->Draw("");
 
-  drawCMSLabel(c3, "Internal Simulation", "2024 pp (5.36 TeV)");  
+  drawCMSLabel(c3, "Internal Simulation", "2024 pp (5.36 TeV)");
+
+  // Save the matrices + the efficiency slice as PDFs, next to the unfolding plots.
+  TString outdir = "/data_CMS/cms/zaidan/analysis_lise/Run3/";
+  c->SaveAs(outdir + "purity_matrix.pdf");
+  c2->SaveAs(outdir + "efficiency_matrix.pdf");
+  c3->SaveAs(outdir + "efficiency_slice_pt2.pdf");
 }

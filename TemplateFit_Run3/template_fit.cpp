@@ -18,13 +18,23 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
     // Test CMS style 
     // setCMSStyle();
 
-    // -- Make subdirectory for printed canvases only. The root files are in main directory 
-    TString sDir_canvas = Form("%s/%s", sDirname.Data(), varNames[ivar].Data());
-        gSystem->mkdir(sDir_canvas, kTRUE); // to be clean 
+    // -- All wanted plots go into one flat directory: sDirname_www. No per-variation
+    // subfolders, and the root files stay in the main directory (sDirname).
+    // Only the nominal variation is plotted -- the others are still fitted, because
+    // draw_variation_uncertainity() needs their fractions for the 0B systematic, but
+    // their per-bin canvases are not wanted.
+    const bool save_png = (ivar == NOMINAL);
+    TString sDir_canvas = sDirname_www;
+        if (save_png) gSystem->mkdir(sDir_canvas, kTRUE);
 
-    // Make subdirectory for webversion only 
+/* ---- disabled (kept for reference): per-variation subfolders and the separate _www tree ----
+    TString sDir_canvas = Form("%s/%s", sDirname.Data(), varNames[ivar].Data());
+        gSystem->mkdir(sDir_canvas, kTRUE); // to be clean
+
+    // Make subdirectory for webversion only
     TString sDir_canvas_www = Form("%s/%s", sDirname_www.Data(), varNames[ivar].Data());
         gSystem->mkdir(sDir_canvas_www, kTRUE);
+*/ // ---- end disabled block ----
 
     // -- For output histograms 
     TFile *fout = new TFile(Form("%s/%s", sDirname.Data(), fout_name.Data()), "recreate");
@@ -90,32 +100,44 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
                     if(!h3D_dataLowEG){Error("Get:", "histogram does not exist '%s' ",h3D_dataLowEG->GetName()); return;}
                 h3D_data->Add(h3D_dataLowEG);
             }
-        // -- data: set style 
+        // -- data: set style
         h3D_data->SetTitle("Data");
-        h3D_data->SetMarkerStyle(20);
-        h3D_data->SetMarkerColor(kBlack);
-        h3D_data->SetLineColor(kBlack);
-        h3D_data->SetLineWidth(3);
+        styleData(h3D_data);
 
-        // -- bjet histograms 
+        // -- bjet histograms
         if(also_bjet){
             h3D_b_bjet->SetTitle("1B (bjet)");h3D_bb_bjet->SetTitle("2B (bjet)");
-            h3D_b_bjet->GetXaxis()->SetTitle("m_{2B} [GeV]"); // Name is wrong in MC templates (EEC) 
-            h3D_b_bjet->SetFillColor(kMagenta-5); h3D_b_bjet->SetLineColor(kMagenta-5);        
-            h3D_bb_bjet->SetFillColor(kMagenta-3); h3D_bb_bjet->SetLineColor(kMagenta-3);            
+            h3D_b_bjet->GetXaxis()->SetTitle("m_{2B} [GeV]"); // Name is wrong in MC templates (EEC)
+            // Same category colours as the qcd templates -- 1B is 1B whichever sample it
+            // came from -- with a hatched fill as the only thing saying "bjet sample".
+            styleTemplate(h3D_b_bjet,  TFColor::c1B()); h3D_b_bjet ->SetFillStyle(3354);
+            styleTemplate(h3D_bb_bjet, TFColor::c2B()); h3D_bb_bjet->SetFillStyle(3345);
         }
 
         // -- qcd
         h3D_b->SetTitle("1B (qcd)");h3D_bb->SetTitle("2B (qcd)"); h3D_nob ->SetTitle("0B (qcd)");
-        h3D_b->SetFillColor(kBlue-4); h3D_b->SetLineColor(kBlue-4);        
-        h3D_bb->SetFillColor(kBlue-6); h3D_bb->SetLineColor(kBlue-6); 
-        h3D_nob->SetFillColor(kRed); h3D_nob->SetLineColor(kRed); 
+        styleTemplate(h3D_b,   TFColor::c1B());
+        styleTemplate(h3D_bb,  TFColor::c2B());
+        styleTemplate(h3D_nob, TFColor::c0B());
 
-    //define used bins 
-    // overwrite bins from data histograms (if different)
-    bins_pt = h3D_data->GetNbinsZ();
-    bins_dr = h3D_data->GetNbinsY(); 
-    mb_bins = h3D_data->GetNbinsX();
+    // -- Define used bins.
+    // The binning is owned by binning_histos_small.h: the inputs were booked from it and
+    // the loops below index jtpt_binsVector / dr_binsVector with the bin counters, so the
+    // two have to agree. Verify that here rather than silently adopting whatever the file
+    // happens to contain -- adding a pT bin to jtpt_binsVector and regenerating the inputs
+    // is then picked up automatically, and forgetting to regenerate stops the job.
+    if (!CheckInputBinning(h3D_data)) return;
+    if (!CheckInputBinning(h3D_b))    return;
+    if (!CheckInputBinning(h3D_bb))   return;
+    if (!CheckInputBinning(h3D_nob))  return;
+    if (also_bjet) {
+        if (!CheckInputBinning(h3D_b_bjet))  return;
+        if (!CheckInputBinning(h3D_bb_bjet)) return;
+    }
+
+    bins_pt = jtpt_binsVectorSize - 1; // == jtpt_bins, and == h3D_data->GetNbinsZ()
+    bins_dr = dr_binsVectorSize   - 1;
+    mb_bins = mb_binsVectorSize   - 1; // updated below if the mass axis is rebinned
         cout << "-- Data hist initial binning" << endl;
         cout << "pt bins = "<< bins_pt << endl;
         cout << "dr bins = "<< bins_dr << endl;
@@ -137,10 +159,7 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
     {
         // TH3D* h3_fitRange0to7 = MergeLastMassBinTo7GeV(h3_original);
         h3D_data = MergeLastMassBinTo7GeV(h3D_data);
-                h3D_data->SetMarkerStyle(20);
-                h3D_data->SetMarkerColor(kBlack);
-                h3D_data->SetLineColor(kBlack);
-                h3D_data->SetLineWidth(3);
+                styleData(h3D_data);   // the merge hands back a fresh, unstyled histogram
 
         h3D_b    = MergeLastMassBinTo7GeV(h3D_b);
         h3D_bb   = MergeLastMassBinTo7GeV(h3D_bb);
@@ -158,10 +177,7 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
     else if(ivar == FITRANGE_0_8)
     {
         h3D_data = MergeLastMassBinTo8GeV(h3D_data);
-                h3D_data->SetMarkerStyle(20);
-                h3D_data->SetMarkerColor(kBlack);
-                h3D_data->SetLineColor(kBlack);
-                h3D_data->SetLineWidth(3);
+                styleData(h3D_data);   // the merge hands back a fresh, unstyled histogram
 
         h3D_b    = MergeLastMassBinTo8GeV(h3D_b);
         h3D_bb   = MergeLastMassBinTo8GeV(h3D_bb);
@@ -208,7 +224,17 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
 
 
     //-----------------------
+    // -- CMS plot aesthetics, applied once for every canvas this function makes.
     gStyle->SetOptStat(0);
+    gStyle->SetOptTitle(0);        // no ROOT title box: the CMS header + the dr/pT text carry it
+    gStyle->SetLegendBorderSize(0);
+    gStyle->SetLegendFillColor(0);
+    gStyle->SetPadTickX(1);        // ticks mirrored on all four sides
+    gStyle->SetPadTickY(1);
+    gStyle->SetFrameBorderMode(0);
+    gStyle->SetCanvasBorderMode(0);
+    gStyle->SetCanvasColor(0);
+
     // --- Vector to test the convergence
     std::vector <std::pair<int, int>> non_converge_bins;
  
@@ -232,7 +258,7 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
             TH1D *h_data_mb = (TH1D *) h3D_data->ProjectionX(Form("h_data_mb_%d_%d", ibin_dr, ibin_pt), SliceFirstbin_dr, SliceLastbin_dr, SliceFirstbin_pt, SliceLastbin_pt);
                 h_data_mb->GetXaxis()->SetTitle("m_{2B} [GeV]");
                 h_data_mb->SetTitle(h3D_data->GetTitle()); // upadte projection title
-                h_data_mb->SetLineWidth(2);
+                styleData(h_data_mb);
             
             // Make slices for dijet
             TH1D *h_bb = (TH1D *) h3D_bb->ProjectionX(Form("h_bb_%d_%d", ibin_dr, ibin_pt), SliceFirstbin_dr, SliceLastbin_dr, ibin_pt, ibin_pt);
@@ -336,13 +362,14 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
                     h_sumbkg_0b_1b->SetTitle("0B +1B (qcd+bjet)");
 
 
-                // -- set the combined samples styles before fit 
-                h_sumbkg->SetFillColor(kGreen-2); h_sumbkg->SetLineColor(kGreen-2);        
-                h_sumsig->SetFillColor(kOrange-6); h_sumsig->SetLineColor(kOrange-6);
-                    // and for the bkg 1B + 0B 
-                    h_sumbkg_0b_1b->SetFillColor(kGreen); h_sumbkg_0b_1b->SetLineColor(kGreen);  
+                // -- set the combined samples styles before fit
+                styleTemplate(h_sumbkg, TFColor::c1B());   // 1B (qcd [+ bjet])
+                styleTemplate(h_sumsig, TFColor::c2B());   // 2B (qcd [+ bjet])
+                    // and for the bkg 1B + 0B: a sum of two categories, so the neutral
+                    // colour rather than blue or green -- it is neither on its own.
+                    styleTemplate(h_sumbkg_0b_1b, TFColor::bkg());
                     // 0B only
-                    h_nob->SetFillColor(kRed); h3D_nob->SetLineColor(kRed); 
+                    styleTemplate(h_nob, TFColor::c0B());
 
                 // write to rootfile the used slices 
                 fout->cd();
@@ -352,6 +379,7 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
                 h_sumbkg_0b_1b->Write(); // 1B (qcd + bjet) + 0B 
 
 
+/* ---- disabled (kept for reference): prefit control canvases (all contributions / raw templates) ----
     // -------- Draw prefits 
         // contirbutions seperated  
                 // absolute yields: seperated contributions: qcd, bjet 
@@ -402,6 +430,7 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
                             DrawCommonTextTopRight(canva_sum_beforefit, ibin_dr, ibin_pt, yBins, N_bins_dr);
                             canva_sum_beforefit->Write();
                             canva_sum_beforefit->Print(Form("%s/%s_templates_beforefit.png", sDir_canvas.Data(), sname_canvas.Data()));
+*/ // ---- end disabled block ----
 
         // -- Safety for empty bins 
             if ((int0 + int1 + int2) < 1  ) { cout << " ----------- empty bin -----------  "; continue;}   
@@ -477,13 +506,14 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
             // set PDF titles 
             h_bkg->SetTitle("1B + 0B");
             h_sig->SetTitle("2B");
-            h_sig->SetFillStyle(3244);
-            h_bkg->SetFillColor(kGreen+2);
-            h_sig->SetFillColor(kOrange+4);
-            h_bkg->SetLineColor(kGreen+2);
-            h_sig->SetLineColor(kOrange+4);
+            styleTemplate(h_bkg, TFColor::bkg());   // 1B + 0B summed -> neutral
+            styleTemplate(h_sig, TFColor::c2B());
+            // Solid, NOT the old 3244 hatch: h_sig is cloned into h_2B_scaledtoData (prefit
+            // stack) and h_sig_fit (postfit stack) and carries its fill style with it, so a
+            // hatch here made the prefit 2B slice a different texture from the postfit one.
 
 
+/* ---- disabled (kept for reference): normalized-PDF prefit canvas ----
             // normlaized data for comparison 
             TH1D* hnorm_data_self = (TH1D*)h_data_mb ->Clone("hnorm_data_self");
                 hnorm_data_self->Scale(1./hnorm_data_self->Integral(1, mb_bins, "width"));
@@ -503,6 +533,7 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
                             DrawCommonTextTopRight(canva_pdf_norm_beforefit, ibin_dr, ibin_pt, yBins, N_bins_dr);
                             canva_pdf_norm_beforefit->Write();
                             canva_pdf_norm_beforefit->Print(Form("%s/%s_PDF_norm_beforefit.png", sDir_canvas.Data(), sname_canvas.Data()));
+*/ // ---- end disabled block ----
     /*        
 
             // what about a stack of PDFs before fit 
@@ -612,7 +643,8 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
                     pad11->SetTopMargin(0.14); // new to allow cms label
                     pad22->SetTopMargin(0.03);// 0.02     // bottom pad (very small)
                     pad22->SetBottomMargin(0.40);  // keep space for x-axis labels
-                    pad22->SetLeftMargin(0.18);  
+                    pad22->SetLeftMargin(0.18);
+                    pad11->SetTicks(1, 1); pad22->SetTicks(1, 1);   // ticks on all four sides
                     pad11->Draw();
                     pad22->Draw(); 
                     pad11->cd();
@@ -631,7 +663,9 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
                             {"Data", "2B", "1B", "0B"} 
                         );
                         leg_pre->Draw("same");
-                        pad11->Modified(); // force refresh 
+                        // Real data on this canvas -> "Internal", not "Simulation Internal".
+                        drawCMSHeader(pad11);
+                        pad11->Modified(); // force refresh
                         pad11->Update();
                     pad22->cd(); 
                     // Draw ratio: data/total MC stack
@@ -639,9 +673,9 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
                     AddRatioPlot(h_data_mb, hsatckMC_total, "Data/MC");
                     pad22->SetTickx(1);// → draws ticks on both bottom and top
                         fout->cd();
-                        cRatio_prefit->Write();
-                        cRatio_prefit->Print(Form("%s/Prefit_%s.png", sDir_canvas.Data(), sname_canvas.Data()));
-                        if( !(ibin_dr == 0 || ibin_pt ==0 ))  cRatio_prefit->Print(Form("%s/Prefit_%s.png", sDir_canvas_www.Data(), sname_canvas.Data()));
+                        // cRatio_prefit->Write(); // canvas not stored in the root file
+                        if (save_png) cRatio_prefit->Print(Form("%s/Prefit_%s.png", sDir_canvas.Data(), sname_canvas.Data()));
+                        // was: a second copy into the per-variation _www subfolder, for non-integrated bins only
 
 
             ///// Fitting
@@ -763,55 +797,49 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
                 h_sig_fit->SetTitle("2B");
                 h_sig_fit->GetYaxis()->SetTitle("Counts/[GeV^{2}]");
 
-                h_sig_fit->SetMarkerColor(kRed+2);
-                h_sig_fit->SetLineColor(kRed+2);
-                h_sig_fit->SetFillColor(kRed+2);
-                h_sig_fit->SetFillStyle(3001); // solid
+                styleTemplate(h_sig_fit, TFColor::c2B());   // 2B -> red
                 cout << "Signal integral after fit = " << h_sig_fit->Integral(1, mb_bins, "width") << endl;
 
-            TH1D *h_bkg_fit = (TH1D*) h_bkg->Clone(Form("h_bkg_fit_%d_%d", ibin_dr, ibin_pt)); // total bkg 
+            TH1D *h_bkg_fit = (TH1D*) h_bkg->Clone(Form("h_bkg_fit_%d_%d", ibin_dr, ibin_pt)); // total bkg
                 h_bkg_fit->Scale(integral_inputdata * (1.0 - p0));
                 h_bkg_fit->SetTitle("1B+ 0B");
-                h_bkg_fit->SetMarkerColor(kCyan+2);
-                h_bkg_fit->SetLineColor(kCyan+2);
-                h_bkg_fit->SetFillColor(kCyan+2);
+                styleTemplate(h_bkg_fit, TFColor::bkg());   // 1B + 0B summed -> neutral
 
-
-            TH1D *h_bkg_fit_1b = (TH1D*) h_bkg->Clone(Form("h_bkg_fit_1b_%d_%d", ibin_dr, ibin_pt)); // 1B only 
+            TH1D *h_bkg_fit_1b = (TH1D*) h_bkg->Clone(Form("h_bkg_fit_1b_%d_%d", ibin_dr, ibin_pt)); // 1B only
                 h_bkg_fit_1b->Scale(integral_inputdata * p1);
                 h_bkg_fit_1b->SetTitle("1B");
-                h_bkg_fit_1b->SetMarkerColor(kOrange+2);
-                h_bkg_fit_1b->SetLineColor(kOrange+2);
-                h_bkg_fit_1b->SetLineWidth(2);
-                h_bkg_fit_1b->SetFillColor(kOrange+2);
+                styleTemplate(h_bkg_fit_1b, TFColor::c1B());   // 1B -> blue
 
-            TH1D *h_bkg_fit_nob = (TH1D*) h_bkg->Clone(Form("h_bkg_fit_nob_%d_%d", ibin_dr, ibin_pt)); // 0B only 
+            TH1D *h_bkg_fit_nob = (TH1D*) h_bkg->Clone(Form("h_bkg_fit_nob_%d_%d", ibin_dr, ibin_pt)); // 0B only
                 h_bkg_fit_nob->Scale(integral_inputdata * p2);
                 h_bkg_fit_nob->SetTitle("0B");
-                h_bkg_fit_nob->SetMarkerColor(kYellow+2);
-                h_bkg_fit_nob->SetLineColor(kYellow+2);
-                h_bkg_fit_nob->SetFillColor(kYellow+2);
-                h_bkg_fit_nob->SetLineWidth(2);
+                styleTemplate(h_bkg_fit_nob, TFColor::c0B());  // 0B -> green
 
                 // And the post-fit template (fitted sig + bkg)
             TH1D* h_total_fit = (TH1D*) h_sig_fit->Clone(Form("h_total_fit_%d_%d", ibin_dr, ibin_pt));
                   h_total_fit->Add(h_bkg_fit);
                   h_total_fit->SetTitle("Total fit");
-                    h_total_fit->SetFillColor (0); // remove color
-                    h_total_fit->SetMarkerColor(kGreen+2);
-                    h_total_fit->SetLineColor(kGreen+2);
-                    h_total_fit->SetMarkerStyle(22);
+                    // The sum of the three slices, not a category of its own: neutral dark
+                    // outline and no fill, so it cannot be misread as one of them.
+                    h_total_fit->SetFillColor(0);
+                    h_total_fit->SetFillStyle(0);
+                    h_total_fit->SetMarkerColor(TFColor::total());
+                    h_total_fit->SetLineColor(TFColor::total());
+                    h_total_fit->SetMarkerStyle(1);
                     h_total_fit->SetLineWidth(2);
 
 
             // Save Signal and bkg mass distributions after the fit 
             fout->cd();
-            h_sig_fit->Write();
-            h_bkg_fit->Write();
-            h_total_fit->Write();
+            h_sig_fit->Write();     // 2B
+            h_bkg_fit_1b->Write();  // 1B
+            h_bkg_fit_nob->Write(); // 0B
+            h_bkg_fit->Write();     // 1B + 0B
+            h_total_fit->Write();   // 2B + 1B + 0B
 
             /// -- Draw useful canvas: Distiburions of Sig, Bkg, MC before and after fit 
             TString sname_canvas_afterfit = sname_canvas + "_afterfit";
+/* ---- disabled (kept for reference): after-fit overlay canvas (data vs. total fit vs. components) ----
             auto canva_afterfit = new TCanvas(Form("ALLHist_%s", sname_canvas_afterfit.Data()) ,Form("Templaets pre and post-fit, %s", sname_canvas.Data()), 800, 800 );
                 canva_afterfit->cd();
                 h_data_mb->SetTitle("Data");
@@ -834,6 +862,8 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
                 canva_afterfit->Modified();
                 canva_afterfit->Update();
                
+*/ // ---- end disabled block ----
+                h_sig_fit->SetLineWidth(1); // stack-slice outline: 1, so it does not read as a curve
 
         // -- After fit: stacked: seperated contibutions 
             THStack hstack_afterfit("hstack_afterfit","Mass stacked histogram");
@@ -843,6 +873,7 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
                 hstack_afterfit.Add(h_bkg_fit_nob);
                 hstack_afterfit.SetMaximum(1.2 * hstack_afterfit.GetMaximum());
 
+/* ---- disabled (kept for reference): after-fit control canvases (stacked / normalized stack) ----
             auto canva_stack_afterfit = new TCanvas(Form("All_templates_Data_stacked_%s", sname_canvas_afterfit.Data()),Form(""), 800, 800 );
                 canva_stack_afterfit->cd();
                 hstack_afterfit.Draw("hist E"); 
@@ -885,6 +916,7 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
                 DrawCommonTextTopRight(canva_stack_norm_afterfit, ibin_dr, ibin_pt, yBins, N_bins_dr);
                 canva_stack_norm_afterfit->Write();
                 canva_stack_norm_afterfit->Print(Form("%s/%s.png", sDir_canvas.Data(), canva_stack_norm_afterfit->GetName()));
+*/ // ---- end disabled block ----
 
             //-- ratio plot: data /total fit
                 TCanvas* c = new TCanvas(Form("RatioPlot_%s", sname_canvas_afterfit.Data()), "", 1100, 1100); // 900, 1100
@@ -895,14 +927,21 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
                     pad1->SetTopMargin(0.14); // new to allow cms label
                     pad2->SetTopMargin(0.03);// 0.02     // bottom pad (very small)
                     pad2->SetBottomMargin(0.40);  // keep space for x-axis labels
-                    pad2->SetLeftMargin(0.18);  
+                    pad2->SetLeftMargin(0.18);
+                    pad1->SetTicks(1, 1); pad2->SetTicks(1, 1);   // ticks on all four sides
                     pad1->Draw();
-                    pad2->Draw(); 
+                    pad2->Draw();
                     pad1->cd();
-                    // Draw frame to control y axis name: frame needed to control y axis name 
-                    TH1F *frame = pad1->DrawFrame(hstack_afterfit.GetXaxis()->GetXmin(), 0, hstack_afterfit.GetXaxis()->GetXmax(), hstack_afterfit.GetMaximum()*1.3);
+                    // Draw frame to control y axis name: frame needed to control y axis name
+                    // Range comes from h_data_mb, not from hstack_afterfit: THStack::GetXaxis()
+                    // returns null until the stack has been painted, and the only Draw() of this
+                    // stack is the one below. h_data_mb shares the mass axis with every template,
+                    // and the stack sums to h_total_fit (p1 + p2 = 1 - p0), so this is equivalent
+                    // without depending on paint order.
+                    Double_t ymax_postfit = 1.3 * std::max(h_data_mb->GetMaximum(), h_total_fit->GetMaximum());
+                    TH1F *frame = pad1->DrawFrame(h_data_mb->GetXaxis()->GetXmin(), 0, h_data_mb->GetXaxis()->GetXmax(), ymax_postfit);
                         frame->GetYaxis()->SetTitle("Counts/[GeV]");
-                        frame->GetXaxis()->SetLabelSize(0); // Remove labels of this Pad 
+                        frame->GetXaxis()->SetLabelSize(0); // Remove labels of this Pad
                         hstack_afterfit.Draw("hist E same"); 
                         h_data_mb->Draw("PE same"); 
                         // h_total_fit->Draw("P E SAME");
@@ -915,42 +954,48 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
                             {"Data", "", "", ""} // use default titles 
                         );
                         leg->Draw("same");
-                    // test CMS label 
-                // drawCMSLabel(c, "Internal", "2024 pp (5.36 TeV)"); // CMS style header
-                        pad1->Modified(); // force refresh 
+                        // Real data on this canvas -> "Internal", not "Simulation Internal".
+                        drawCMSHeader(pad1);
+                        pad1->Modified(); // force refresh
                         pad1->Update();
                     pad2->cd(); 
                 // setCMSStyle(); // also for Pad2 
                     AddRatioPlot(h_data_mb, h_total_fit);
                     pad2->SetTickx(1);// → draws ticks on both bottom and top
                         fout->cd();
-                        c ->Write();
-                        c ->Print(Form("%s/%s.png", sDir_canvas.Data(), c->GetName()));
-                        if( !(ibin_dr == 0 || ibin_pt ==0 ))  c ->Print(Form("%s/Postfit_%s.png", sDir_canvas_www.Data(), sname_canvas.Data()));
+                        // c ->Write(); // canvas not stored in the root file
+                        if (save_png) c ->Print(Form("%s/%s.png", sDir_canvas.Data(), c->GetName())); // RatioPlot_ptbin_N_deltaRbin_M_afterfit.png
+                        // was: a second copy into the per-variation _www subfolder, for non-integrated bins only
 
                 cout << "---------------------\n\n\n" << endl; 
             } // loop over deltaR bins 
     }
 
+/* ---- disabled (kept for reference): duplicate TH3D write, inputs already saved before the fit loop ----
     // Save histograms
     // TH3D 
     for (auto h : {h3D_data, h3D_bb, h3D_b}){h->Write();}
     if (also_bjet){
         for (auto h : {h3D_bb_bjet, h3D_b_bjet}) {h->Write();}
     }   
+*/ // ---- end disabled block ----
 
 
 
-    // TH2D     
-    for (auto h : {h_sig_fraction, h_sig_fraction_error,
-                   h_bkg_fraction, h_bkg_fraction_error,
-                   h_sig_frac_true, h_sig_frac_true_error,
-                   h_bkg_frac_true, h_bkg_frac_true_error,
+    // TH2D: signal / background fractions.
+    // The bin errors are stored inside these histograms, so the separate
+    // *_error clones are not written anymore (h_sig_frac_true_error and
+    // h_*_error_fitbins were never even filled).
+    fout->cd();
+    for (auto h : {h_sig_fraction,
+                   h_bkg_fraction,
+                   h_sig_frac_true,
+                   h_bkg_frac_true,
 
-                   h_sig_fraction_fit, h_sig_fraction_fit_error,
-                   h_bkg_fraction_fit, h_bkg_fraction_fit_error,
-                   h_sig_frac_true_fitbins, h_sig_frac_true_error_fitbins,
-                   h_bkg_frac_true_fitbins, h_bkg_frac_true_error_fitbins
+                   h_sig_fraction_fit,
+                   h_bkg_fraction_fit,
+                   h_sig_frac_true_fitbins,
+                   h_bkg_frac_true_fitbins
                    }) {
                     h->Write();
     }
@@ -1024,34 +1069,34 @@ void Draw_template_Run3(TString &templates, TString pT_selection, TString folder
                     if(!h3D_dataLowEG){Error("Get:", "histogram does not exist '%s' ",h3D_dataLowEG->GetName()); return;}
                 h3D_data->Add(h3D_dataLowEG);
             }
-        // -- data: set style 
+        // -- data: set style
         h3D_data->SetTitle("Data");
-        h3D_data->SetMarkerStyle(20);
-        h3D_data->SetMarkerColor(kBlack);
-        h3D_data->SetLineColor(kBlack);
-        h3D_data->SetLineWidth(3);
+        styleData(h3D_data);
 
-        // bjet 
+        // bjet
         h3D_b_bjet->SetTitle("1B (bjet)");h3D_bb_bjet->SetTitle("2B (bjet)");
-        // its x axis name is not correct 
-        h3D_b_bjet->GetXaxis()->SetTitle("m_{2B} [GeV]"); // Name is wrong in MC templates (EEC) 
-        h3D_b_bjet->SetFillColor(kMagenta-5); h3D_b_bjet->SetLineColor(kMagenta-5);        
-        h3D_bb_bjet->SetFillColor(kMagenta-3); h3D_bb_bjet->SetLineColor(kMagenta-3);
+        // its x axis name is not correct
+        h3D_b_bjet->GetXaxis()->SetTitle("m_{2B} [GeV]"); // Name is wrong in MC templates (EEC)
+        styleTemplate(h3D_b_bjet,  TFColor::c1B()); h3D_b_bjet ->SetFillStyle(3354);
+        styleTemplate(h3D_bb_bjet, TFColor::c2B()); h3D_bb_bjet->SetFillStyle(3345);
 */
         // qcd
         h3D_b->SetTitle("1B (qcd)");h3D_bb->SetTitle("2B (qcd)"); h3D_nob ->SetTitle("0B (qcd)");
-        h3D_b->SetFillColor(kBlue-4); h3D_b->SetLineColor(kBlue-4);        
-        h3D_bb->SetFillColor(kBlue-6); h3D_bb->SetLineColor(kBlue-6); 
-        h3D_nob->SetFillColor(kRed); h3D_nob->SetLineColor(kRed); 
+        styleTemplate(h3D_b,   TFColor::c1B());
+        styleTemplate(h3D_bb,  TFColor::c2B());
+        styleTemplate(h3D_nob, TFColor::c0B());
 
-    //define used bins 
-    // overwrite bins from data histograms (if different)
-    // bins_pt = h3D_data->GetNbinsZ();
-    // bins_dr = h3D_data->GetNbinsY(); 
-    // mb_bins = h3D_data->GetNbinsX();
-        bins_pt = h3D_bb->GetNbinsZ();
-        bins_dr = h3D_bb->GetNbinsY(); 
-        mb_bins = h3D_bb->GetNbinsX();
+    // -- Define used bins. Same contract as do_template_fit_combined(): the binning is
+    // owned by binning_histos_small.h, so validate the inputs against it instead of
+    // adopting their axes (these are globals -- adopting them would leave bins_pt out of
+    // step with jtpt_binsVector for everything that runs afterwards).
+    if (!CheckInputBinning(h3D_bb))  return;
+    if (!CheckInputBinning(h3D_b))   return;
+    if (!CheckInputBinning(h3D_nob)) return;
+
+        bins_pt = jtpt_binsVectorSize - 1;
+        bins_dr = dr_binsVectorSize   - 1;
+        mb_bins = mb_binsVectorSize   - 1;
 
         cout << "-- Data hist initial binning" << endl;
         cout << "pt bins = "<< bins_pt << endl;
@@ -1089,8 +1134,16 @@ void Draw_template_Run3(TString &templates, TString pT_selection, TString folder
             TH2D *h_bkg_frac_true_error = (TH2D *) h_sig_fraction->Clone("h_bkg_frac_true_error");
 */
     //-----------------------
-    // -- general style: remove stats box 
+    // -- general style: same CMS aesthetics as do_template_fit_combined()
     gStyle->SetOptStat(0);
+    gStyle->SetOptTitle(0);
+    gStyle->SetLegendBorderSize(0);
+    gStyle->SetLegendFillColor(0);
+    gStyle->SetPadTickX(1);
+    gStyle->SetPadTickY(1);
+    gStyle->SetFrameBorderMode(0);
+    gStyle->SetCanvasBorderMode(0);
+    gStyle->SetCanvasColor(0);
 
     // ---------------------------------------------------------
     // --- Vector to test the convergence
@@ -1223,11 +1276,11 @@ void Draw_template_Run3(TString &templates, TString pT_selection, TString folder
                     else {h_sumbkg_0b_1b->SetTitle("0B +1B (qcd)"); }
 
 
-                // -- set the combined samples styles before fit 
-                h_sumbkg->SetFillColor(kGreen-2); h_sumbkg->SetLineColor(kGreen-2);        
-                h_sumsig->SetFillColor(kOrange-6); h_sumsig->SetLineColor(kOrange-6);
-                    // and for the bkg 1B + 0B 
-                    h_sumbkg_0b_1b->SetFillColor(kGreen); h_sumbkg_0b_1b->SetLineColor(kGreen);  
+                // -- set the combined samples styles before fit
+                styleTemplate(h_sumbkg, TFColor::c1B());   // 1B
+                styleTemplate(h_sumsig, TFColor::c2B());   // 2B
+                    // and for the bkg 1B + 0B: a sum of two categories -> neutral
+                    styleTemplate(h_sumbkg_0b_1b, TFColor::bkg());
 
                 // write to rootfile the used slices 
                 fout->cd();
@@ -1264,6 +1317,8 @@ void Draw_template_Run3(TString &templates, TString pT_selection, TString folder
                             canva_beforefit->Update();
                             fout->cd();
                             DrawCommonTextTopRight(canva_beforefit, ibin_dr, ibin_pt, yBins, N_bins_dr);
+                            // MC templates only on this canvas -> "Simulation Internal".
+                            drawCMSHeader(canva_beforefit, "Simulation Internal");
                             canva_beforefit->Write();
                             canva_beforefit->Print(Form("%s/%s_allcontributions_beforefit.png", sDir_canvas.Data(), sname_canvas.Data()));
 
@@ -1285,6 +1340,8 @@ void Draw_template_Run3(TString &templates, TString pT_selection, TString folder
                             canva_sum_beforefit->Update();
                             fout->cd();
                             DrawCommonTextTopRight(canva_sum_beforefit, ibin_dr, ibin_pt, yBins, N_bins_dr);
+                            // MC templates only on this canvas -> "Simulation Internal".
+                            drawCMSHeader(canva_sum_beforefit, "Simulation Internal");
                             canva_sum_beforefit->Write();
                             canva_sum_beforefit->Print(Form("%s/%s_templates_beforefit.png", sDir_canvas.Data(), sname_canvas.Data()));
 
@@ -1362,14 +1419,11 @@ void Draw_template_Run3(TString &templates, TString pT_selection, TString folder
             // set PDF titles 
             h_bkg->SetTitle("1B + 0B");
             h_sig->SetTitle("2B");
-            h_sig->SetFillStyle(3244);
-            h_bkg->SetFillColor(kGreen+2);
-            h_sig->SetFillColor(kOrange+4);
-            h_bkg->SetLineColor(kGreen+2);
-            h_sig->SetLineColor(kOrange+4);
+            styleTemplate(h_bkg, TFColor::bkg());   // 1B + 0B summed -> neutral
+            styleTemplate(h_sig, TFColor::c2B());
 
 
-            // normlaized data for comparison 
+            // normlaized data for comparison
             /*TH1D* hnorm_data_self = (TH1D*)h_data_mb ->Clone("hnorm_data_self");
                 hnorm_data_self->Scale(1./hnorm_data_self->Integral(1, mb_bins, "width"));
                 hnorm_data_self->SetTitle("data self normalized");
@@ -1386,6 +1440,8 @@ void Draw_template_Run3(TString &templates, TString pT_selection, TString folder
                             canva_pdf_norm_beforefit->Update();
                             fout->cd();
                             DrawCommonTextTopRight(canva_pdf_norm_beforefit, ibin_dr, ibin_pt, yBins, N_bins_dr);
+                            // MC templates only on this canvas -> "Simulation Internal".
+                            drawCMSHeader(canva_pdf_norm_beforefit, "Simulation Internal");
                             canva_pdf_norm_beforefit->Write();
                             canva_pdf_norm_beforefit->Print(Form("%s/%s_PDF_norm_beforefit.png", sDir_canvas.Data(), sname_canvas.Data()));
             
@@ -1410,6 +1466,8 @@ void Draw_template_Run3(TString &templates, TString pT_selection, TString folder
                                 canva_pdfs_scaledtoqcd->Update();
                                 fout->cd();
                                 DrawCommonTextTopRight(canva_pdfs_scaledtoqcd, ibin_dr, ibin_pt, yBins, N_bins_dr);
+                                // MC templates only on this canvas -> "Simulation Internal".
+                                drawCMSHeader(canva_pdfs_scaledtoqcd, "Simulation Internal");
                                 canva_pdfs_scaledtoqcd->Write();
                                 canva_pdfs_scaledtoqcd->Print(Form("%s/%s_pdfs_scaledtoqcdfractions_beforefit.png", sDir_canvas.Data(), sname_canvas.Data()));
             
@@ -1437,6 +1495,8 @@ void Draw_template_Run3(TString &templates, TString pT_selection, TString folder
                                 canva_pdfs_scaledtoqcd_int->Update();
                                 fout->cd();
                                 DrawCommonTextTopRight(canva_pdfs_scaledtoqcd_int, ibin_dr, ibin_pt, yBins, N_bins_dr);
+                                // MC templates only on this canvas -> "Simulation Internal".
+                                drawCMSHeader(canva_pdfs_scaledtoqcd_int, "Simulation Internal");
                                 canva_pdfs_scaledtoqcd_int->Write();
                                 canva_pdfs_scaledtoqcd_int->Print(Form("%s/%s_pdfs_scaledtoqcd_int_beforefit.png", sDir_canvas.Data(), sname_canvas.Data()));
             
@@ -1470,6 +1530,8 @@ void Draw_template_Run3(TString &templates, TString pT_selection, TString folder
                                 canva_pdfs_seperated_scaledtoqcd_int->Update();
                                 fout->cd();
                                 DrawCommonTextTopRight(canva_pdfs_seperated_scaledtoqcd_int, ibin_dr, ibin_pt, yBins, N_bins_dr);
+                                // MC templates only on this canvas -> "Simulation Internal".
+                                drawCMSHeader(canva_pdfs_seperated_scaledtoqcd_int, "Simulation Internal");
                                 canva_pdfs_seperated_scaledtoqcd_int->Write();
                                 canva_pdfs_seperated_scaledtoqcd_int->Print(Form("%s/%s_pdfs_seperated_scaledtoqcd_int_beforefit.png", sDir_canvas.Data(), sname_canvas.Data()));
             /*                     
@@ -1613,44 +1675,35 @@ void Draw_template_Run3(TString &templates, TString pT_selection, TString folder
                 h_sig_fit->SetTitle("2B");
                 h_sig_fit->GetYaxis()->SetTitle("Counts/[GeV^{2}]");
 
-                h_sig_fit->SetMarkerColor(kRed+2);
-                h_sig_fit->SetLineColor(kRed+2);
-                h_sig_fit->SetFillColor(kRed+2);
-                h_sig_fit->SetFillStyle(3001); // solid
+                styleTemplate(h_sig_fit, TFColor::c2B());   // 2B -> red
                 cout << "Signal integral after fit = " << h_sig_fit->Integral(1, mb_bins, "width") << endl;
 
-            TH1D *h_bkg_fit = (TH1D*) h_bkg->Clone(Form("h_bkg_fit_%d_%d", ibin_dr, ibin_pt)); // total bkg 
+            TH1D *h_bkg_fit = (TH1D*) h_bkg->Clone(Form("h_bkg_fit_%d_%d", ibin_dr, ibin_pt)); // total bkg
                 h_bkg_fit->Scale(integral_inputdata * (1.0 - p0));
                 h_bkg_fit->SetTitle("1B+ 0B");
-                h_bkg_fit->SetMarkerColor(kCyan+2);
-                h_bkg_fit->SetLineColor(kCyan+2);
-                h_bkg_fit->SetFillColor(kCyan+2);
+                styleTemplate(h_bkg_fit, TFColor::bkg());   // 1B + 0B summed -> neutral
 
-
-            TH1D *h_bkg_fit_1b = (TH1D*) h_bkg->Clone(Form("h_bkg_fit_1b_%d_%d", ibin_dr, ibin_pt)); // 1B only 
+            TH1D *h_bkg_fit_1b = (TH1D*) h_bkg->Clone(Form("h_bkg_fit_1b_%d_%d", ibin_dr, ibin_pt)); // 1B only
                 h_bkg_fit_1b->Scale(integral_inputdata * p1);
                 h_bkg_fit_1b->SetTitle("1B");
-                h_bkg_fit_1b->SetMarkerColor(kOrange+2);
-                h_bkg_fit_1b->SetLineColor(kOrange+2);
-                h_bkg_fit_1b->SetLineWidth(2);
-                h_bkg_fit_1b->SetFillColor(kOrange+2);
+                styleTemplate(h_bkg_fit_1b, TFColor::c1B());   // 1B -> blue
 
-            TH1D *h_bkg_fit_nob = (TH1D*) h_bkg->Clone(Form("h_bkg_fit_nob_%d_%d", ibin_dr, ibin_pt)); // 0B only 
+            TH1D *h_bkg_fit_nob = (TH1D*) h_bkg->Clone(Form("h_bkg_fit_nob_%d_%d", ibin_dr, ibin_pt)); // 0B only
                 h_bkg_fit_nob->Scale(integral_inputdata * p2);
                 h_bkg_fit_nob->SetTitle("0B");
-                h_bkg_fit_nob->SetMarkerColor(kYellow+2);
-                h_bkg_fit_nob->SetLineColor(kYellow+2);
-                h_bkg_fit_nob->SetFillColor(kYellow+2);
-                h_bkg_fit_nob->SetLineWidth(2);
+                styleTemplate(h_bkg_fit_nob, TFColor::c0B());  // 0B -> green
 
                 // And the post-fit template (fitted sig + bkg)
             TH1D* h_total_fit = (TH1D*) h_sig_fit->Clone(Form("h_total_fit_%d_%d", ibin_dr, ibin_pt));
                   h_total_fit->Add(h_bkg_fit);
                   h_total_fit->SetTitle("Total fit");
-                    h_total_fit->SetFillColor (0); // remove color
-                    h_total_fit->SetMarkerColor(kGreen+2);
-                    h_total_fit->SetLineColor(kGreen+2);
-                    h_total_fit->SetMarkerStyle(22);
+                    // The sum of the three slices, not a category of its own: neutral dark
+                    // outline and no fill, so it cannot be misread as one of them.
+                    h_total_fit->SetFillColor(0);
+                    h_total_fit->SetFillStyle(0);
+                    h_total_fit->SetMarkerColor(TFColor::total());
+                    h_total_fit->SetLineColor(TFColor::total());
+                    h_total_fit->SetMarkerStyle(1);
                     h_total_fit->SetLineWidth(2);
 
 
@@ -1810,7 +1863,8 @@ void Draw_template_Run3(TString &templates, TString pT_selection, TString folder
 
 void template_fit(){
     // -- Output folder to save the result of the tests 
-    gSystem->mkdir(sDirname, kTRUE);// Predefined in Help.h
+    gSystem->mkdir(sDirname, kTRUE);// Predefined in Help.h -- holds the root files
+    gSystem->mkdir(sDirname_www, kTRUE);// single flat folder holding every png
     TString folder = Form("/home/llr/cms/zaidan/analysis_lise/eec_2b_analysis/TemplateFit_Run3/%s/", sDirname.Data()); // this is sDirname 
         cout << "Output folder path: "<< folder << endl;
 
@@ -1818,7 +1872,7 @@ void template_fit(){
 
 
     //Get data and mc labels
-    TString pT_selection = "80_200";
+    TString pT_selection = "80_inf";
   
     // Add LowEG data 
     bool alsoLowEG = false; 
@@ -1836,8 +1890,8 @@ void template_fit(){
     if (RunN == 3){
         alsoLowEG = false; 
         also_bjet = false;
-        dataset_HG = "/data_CMS/cms/zaidan/analysis_lise/Run3/Run3_btagWP868_template_for_fit_histos_3D_data_f.root";
-        templates_dijet = "/data_CMS/cms/zaidan/analysis_lise/Run3/Run3_btagWP868_template_for_fit_histos_3D_qcd_f.root";
+        dataset_HG = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/HardProbes/agg_template_chunks/Run3_btagWP868_template_for_fit_histos_3D_data_f_80_120_2MCGEN.root";
+        templates_dijet = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/Run3_btagWP868_template_for_fit_histos_3D_qcd_f_80_120_2MCGEN.root";
         fout_name = Form("Run%d_TemplateFits_histos_3d_%s.root", RunN, pT_selection.Data());
     }
     else if (RunN == 2){
@@ -1884,9 +1938,11 @@ void template_fit(){
                 draw_eec_simple(newfout_name, foutputPlots_dijet ,folder, also_bjet, ibin_pt, (Variation) ivar);
 
            // }
-        
 
-        } 
+
+            } // end loop over ibin_pt
+
+        } // end loop over ivar
 
 
     

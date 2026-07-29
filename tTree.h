@@ -49,45 +49,45 @@ public :
    Int_t           jtNtrk[500];   //[nref]
    Float_t         discr_particleNet_BvsAll[500];
    Int_t           ntrk;
-   Int_t           trkJetId[500];   //[ntrk]
-   Int_t           trkSvtxId[500];   //[ntrk]
-   Int_t           trkPdgId[500];    //[ntrk]
-   Int_t           trkMatchPdgId[500];    //[ntrk] // added by zoe
-   Float_t         trkPt[500];   //[ntrk]
-   Float_t         trkEta[500];   //[ntrk]
-   Float_t         trkPhi[500];   //[ntrk]
-   Float_t         trkY[500];   //[ntrk]
-   Float_t         trkIp3d[500];   //[ntrk]
-   Float_t         trkIp3dSig[500];   //[ntrk]
-   Float_t         trkDistToAxisSig[500];   //[ntrk]
-   Float_t         trkDistToAxis[500];   //[ntrk]
-   Int_t           trkMatchSta[500];   //[ntrk]
-   Float_t         trkBdtScore[500]; 
+   Int_t           trkJetId[5000];   //[ntrk]
+   Int_t           trkSvtxId[5000];   //[ntrk]
+   Int_t           trkPdgId[5000];    //[ntrk]
+   Int_t           trkMatchPdgId[5000];    //[ntrk] // added by zoe
+   Float_t         trkPt[5000];   //[ntrk]
+   Float_t         trkEta[5000];   //[ntrk]
+   Float_t         trkPhi[5000];   //[ntrk]
+   Float_t         trkY[5000];   //[ntrk]
+   Float_t         trkIp3d[5000];   //[ntrk]
+   Float_t         trkIp3dSig[5000];   //[ntrk]
+   Float_t         trkDistToAxisSig[5000];   //[ntrk]
+   Float_t         trkDistToAxis[5000];   //[ntrk]
+   Int_t           trkMatchSta[5000];   //[ntrk]
+   Float_t         trkBdtScore[5000]; 
    Double_t        FNscore[500]; 
    Int_t           jtNsvtx[500];   //[nref]
-   Float_t         trkMass[500];
+   Float_t         trkMass[5000];
    Int_t           nsvtx;
-   Int_t           svtxJetId[50];   //[nsvtx]
-   Int_t           svtxNtrk[50];   //[nsvtx]
-   Float_t         svtxdl[50];   //[nsvtx]
-   Float_t         svtxdls[50];   //[nsvtx]
-   Float_t         svtxdl2d[50];   //[nsvtx]
-   Float_t         svtxdls2d[50];   //[nsvtx]
-   Float_t         svtxm[50];   //[nsvtx]
-   Float_t         svtxpt[50];   //[nsvtx]
-   Float_t         svtxmcorr[50];   //[nsvtx]
-   Float_t         svtxnormchi2[50];   //[nsvtx]
+   Int_t           svtxJetId[500];   //[nsvtx]
+   Int_t           svtxNtrk[500];   //[nsvtx]
+   Float_t         svtxdl[500];   //[nsvtx]
+   Float_t         svtxdls[500];   //[nsvtx]
+   Float_t         svtxdl2d[500];   //[nsvtx]
+   Float_t         svtxdls2d[500];   //[nsvtx]
+   Float_t         svtxm[500];   //[nsvtx]
+   Float_t         svtxpt[500];   //[nsvtx]
+   Float_t         svtxmcorr[500];   //[nsvtx]
+   Float_t         svtxnormchi2[500];   //[nsvtx]
 
    //new
    Int_t           nrefTrk;
-   Int_t           refTrkJetId[500];   //[ntrk]
-   Int_t           refTrkPdgId[500];    //[ntrk]
-   Float_t         refTrkPt[500];   //[ntrk]
-   Float_t         refTrkEta[500];   //[ntrk]
-   Float_t         refTrkPhi[500];   //[ntrk]
-   Float_t         refTrkY[500];   //[ntrk]
-   Int_t           refTrkSta[500];   //[ntrk]
-   Float_t         refTrkMass[500];
+   Int_t           refTrkJetId[5000];   //[ntrk]
+   Int_t           refTrkPdgId[5000];    //[ntrk]
+   Float_t         refTrkPt[5000];   //[ntrk]
+   Float_t         refTrkEta[5000];   //[ntrk]
+   Float_t         refTrkPhi[5000];   //[ntrk]
+   Float_t         refTrkY[5000];   //[ntrk]
+   Int_t           refTrkSta[5000];   //[ntrk]
+   Float_t         refTrkMass[5000];
 
    //HLT selection (Run 2)
    Int_t           HLT_HIAK4PFJet100_v1;
@@ -114,12 +114,12 @@ public :
 
 
    Int_t           ntrkInSvtxNotInJet;
-   Int_t           trkInSvtxNotInJetSvId[500];
-   Int_t           trkInSvtxNotInJetOtherJetId[500];
-   Int_t           trkInSvtxNotInJetMatchSta[500];
-   Float_t         trkInSvtxNotInJetPt[500];
-   Float_t         trkInSvtxNotInJetEta[500];
-   Float_t         trkInSvtxNotInJetPhi[500];
+   Int_t           trkInSvtxNotInJetSvId[5000];
+   Int_t           trkInSvtxNotInJetOtherJetId[5000];
+   Int_t           trkInSvtxNotInJetMatchSta[5000];
+   Float_t         trkInSvtxNotInJetPt[5000];
+   Float_t         trkInSvtxNotInJetEta[5000];
+   Float_t         trkInSvtxNotInJetPhi[5000];
 
    // aod compatibility
   Float_t         jtDiscDeepFlavourB[500];   //[nref]
@@ -422,6 +422,17 @@ private: // new to update tree destructor to suite the friend structure addition
 //tTree::tTree(TString rootf)
 tTree::tTree()
 {
+   // Zero-initialize every count leaf that drives a loop bound. If the matching
+   // branch is absent in the input file (or SetBranchAddress fails to bind it),
+   // GetEntry never touches the member, so without this it would hold garbage
+   // and loops like `for (itrk < nrefTrk)` would run off the fixed arrays and
+   // segfault. Zero => the loop simply runs 0 times.
+   nref = 0;
+   ntrk = 0;
+   nrefTrk = 0;
+   nsvtx = 0;
+   ngen = 0;
+   nvtx = 0;
 }
 
 
@@ -698,15 +709,25 @@ void tTree::Init(TString rootf, Int_t dataType, Int_t RunN)
      
      tree->SetBranchAddress("weight", &weight, &b_weight);
      //new
-     tree->SetBranchAddress("refTrkJetId", refTrkJetId, &b_refTrkJetId);
-     tree->SetBranchAddress("refTrkPdgId", refTrkPdgId, &b_refTrkPdgId);
-     tree->SetBranchAddress("refTrkPt", refTrkPt, &b_refTrkPt);
-     tree->SetBranchAddress("refTrkEta", refTrkEta, &b_refTrkEta);
-     tree->SetBranchAddress("refTrkPhi", refTrkPhi, &b_refTrkPhi);
-     tree->SetBranchAddress("refTrkY", refTrkY, &b_refTrkY);
-     tree->SetBranchAddress("refTrkSta", refTrkSta, &b_refTrkSta);
-     tree->SetBranchAddress("refTrkMass", refTrkMass, &b_refTrkMass);
-     tree->SetBranchAddress("nrefTrk", &nrefTrk, &b_nrefTrk);
+     // Gen-track branches. Only bind them if they actually exist in this forest:
+     // binding a missing branch leaves nrefTrk uninitialized, and the gen-track
+     // loops (PartialBsAggregation) would then run off the fixed arrays and
+     // segfault. If absent, leave nrefTrk = 0 (set in the constructor) so those
+     // loops are simply skipped.
+     if (tree->GetBranch("nrefTrk") && tree->GetBranch("refTrkJetId")) {
+       tree->SetBranchAddress("refTrkJetId", refTrkJetId, &b_refTrkJetId);
+       tree->SetBranchAddress("refTrkPdgId", refTrkPdgId, &b_refTrkPdgId);
+       tree->SetBranchAddress("refTrkPt", refTrkPt, &b_refTrkPt);
+       tree->SetBranchAddress("refTrkEta", refTrkEta, &b_refTrkEta);
+       tree->SetBranchAddress("refTrkPhi", refTrkPhi, &b_refTrkPhi);
+       tree->SetBranchAddress("refTrkY", refTrkY, &b_refTrkY);
+       tree->SetBranchAddress("refTrkSta", refTrkSta, &b_refTrkSta);
+       tree->SetBranchAddress("refTrkMass", refTrkMass, &b_refTrkMass);
+       tree->SetBranchAddress("nrefTrk", &nrefTrk, &b_nrefTrk);
+     } else {
+       std::cout << "WARNING: gen-track branches (nrefTrk/refTrk*) not found in this file; "
+                    "gen-level b-hadron aggregation will be skipped (nrefTrk=0)." << std::endl;
+     }
    }
    
 }
