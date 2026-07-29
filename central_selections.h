@@ -318,6 +318,9 @@ std::vector<TString> getActiveBranches(const AnalysisConfig& cfg)
         "vz", // Data and recoMC: in hiEvtAnalyzer/HiTree 
         "jtpt",
         "jteta",
+        "jtphi",
+        "discr_pfJP",
+        "discr_pfWrongJP",
         "nref",
 
         "jtNtrk",
@@ -390,6 +393,16 @@ std::vector<TString> getActiveBranches(const AnalysisConfig& cfg)
             "weight",
             "pthat",
             "jtNbHad",
+            "jtNcHad",
+            "nfullB",
+            "fullBJetId",
+            "fullBPdgId",
+            "fullBSta",
+            "fullBPt",
+            "fullBEta",
+            "fullBPhi",
+            "fullBM",
+            "fullBE",
             // for gen level info
             "refpt",
             "refeta",
@@ -405,7 +418,3 @@ std::vector<TString> getActiveBranches(const AnalysisConfig& cfg)
 
     return branches;
 }
-
-
-
-
