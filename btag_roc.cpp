@@ -87,10 +87,8 @@ DiscHistos fillRun3QCD(Float_t pT_low, Float_t pT_high,
   h.h_2b2sv->Sumw2();
   h.h_all->Sumw2();
 
-  // ---- Build the TChain over the 10 subdirectories ----
-  // NB: adjust base / inner filename here if the sample layout changes.
-  const TString base = "/data_CMS/cms/mnguyen/bJetAggRun3/PPRef2024/QCD";
-  const char *innerFile = "merged_HiForestMiniAOD_v2.root";
+  // ---- Build the TChain over the requested Run3 chunks ----
+  const TString base = "$mydata/bJetAggRun3/PPRef2024/QCD/Pythia8_UParTV2_chunks";
   if (n_subdirs < 1)
     n_subdirs = 1;
   if (n_subdirs > 10)
@@ -98,16 +96,16 @@ DiscHistos fillRun3QCD(Float_t pT_low, Float_t pT_high,
   TChain *ch = new TChain("ak4PFJetAnalyzer/t");
   TChain *chHi = new TChain("hiEvtAnalyzer/HiTree");
   TChain *chHlt = new TChain("hltanalysis/HltTree");
+  int n_added = 0;
   for (int i = 0; i < n_subdirs; i++)
   {
-    TString f = Form("%s/%d/%s", base.Data(), i, innerFile);
-    ch->Add(f);
+    TString f = Form("%s/merged_block_%04d_Pythia8_UParTV2.root", base.Data(), i);
+    n_added += ch->Add(f);
     chHi->Add(f);
     chHlt->Add(f);
   }
-  std::cout << "Run3 PPRef2024 QCD: chaining subdirs 0.." << (n_subdirs - 1) << std::endl;
-  ch->AddFriend(chHi);
-  ch->AddFriend(chHlt);
+  std::cout << "Run3 PPRef2024 QCD: chaining blocks 0000.."
+            << Form("%04d", n_subdirs - 1) << " (added " << n_added << " files)" << std::endl;
 
   // ---- Branch addresses (only what the ROC needs) ----
   Int_t nref = 0;
@@ -131,15 +129,21 @@ DiscHistos fillRun3QCD(Float_t pT_low, Float_t pT_high,
   enable("discr_unifiedParticleTransformer_probb", probb);
   enable("discr_unifiedParticleTransformer_problepb", problepb);
   enable("discr_unifiedParticleTransformer_probbb", probbb);
-  enable("weight", &weight);
   enable("pthat", &pthat);
-  enable("HLT_AK4PFJet60_v8", &HLT_AK4PFJet60_v8);
+
+  chHi->SetBranchStatus("*", 0);
+  chHi->SetBranchStatus("weight", 1);
+  chHi->SetBranchAddress("weight", &weight);
+
+  chHlt->SetBranchStatus("*", 0);
+  chHlt->SetBranchStatus("HLT_AK4PFJet60_v8", 1);
+  chHlt->SetBranchAddress("HLT_AK4PFJet60_v8", &HLT_AK4PFJet60_v8);
 
   Long64_t n_events = ch->GetEntries();
   if (n_events == 0)
   {
-    std::cerr << "WARNING: Run3 PPRef2024 QCD chain is empty ("
-              << base << "/[0-9]/" << innerFile << "). Overlay will be skipped." << std::endl;
+    std::cerr << "WARNING: Run3 PPRef2024 QCD chain is empty under "
+              << base << ". Overlay will be skipped." << std::endl;
     return h;
   }
   std::cout << "Run3 PPRef2024 QCD: " << n_events << " events" << std::endl;
@@ -149,6 +153,8 @@ DiscHistos fillRun3QCD(Float_t pT_low, Float_t pT_high,
     if (ient % 50000 == 0)
       std::cout << "\rProcessing Run3 QCD: " << 100.0 * ient / n_events << " %" << std::flush;
     ch->GetEntry(ient);
+    chHi->GetEntry(ient);
+    chHlt->GetEntry(ient);
 
     if (!HLT_AK4PFJet60_v8)
       continue;
@@ -651,7 +657,7 @@ void calc_btag_roc(TString filename, TString output_folder, TString output_hist,
 }
 
 
-void btag_roc(Int_t dataType = 2, Float_t pT_low = 100, Float_t pT_high = 120, double target_mistag = 1e-3,
+void btag_roc(Int_t dataType = 2, Float_t pT_low = 100, Float_t pT_high = 200, double target_mistag = 1e-3,
               bool overlay_run3_qcd = true, int run3_nfiles = 10) {
 
   TString output_folder = TString(gSystem->DirName(__FILE__)) + "/";
@@ -693,7 +699,7 @@ void plot_roc_run2_vs_run3(TString rootfile = "", TString output_folder = "")
 
   TString dir = TString(gSystem->DirName(__FILE__)) + "/";
   if (rootfile.IsNull())
-    rootfile = dir + "btag_roc_qcd.root";
+    rootfile = dir + "btag_roc_qcd_UParTV2.root";
   if (output_folder.IsNull())
     output_folder = dir;
   if (!rootfile.Contains("/"))

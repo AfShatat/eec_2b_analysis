@@ -102,6 +102,19 @@ struct Vertex {
   std::vector<int> trkSvtxId;
 };
 
+struct RecoSvTruthComposition {
+  int nTracks = 0;
+  int nHfTracks = 0;
+  double totalTrackPt = 0.0;
+  double hfTrackPt = 0.0;
+  double dominantStatusTrackPt = 0.0;
+  double hfTrackPurity = 0.0;
+  double dominantStatusTrackPurity = 0.0;
+  double hfPtPurity = 0.0;
+  double dominantStatusPtPurity = 0.0;
+  double dominantStatusPtOverHfPt = 0.0;
+};
+
 
 //given two vectors, computes deltaR squared 
 auto deltaR2 = [](const ROOT::Math::PtEtaPhiMVector &a,
@@ -119,6 +132,70 @@ void printvtx (const Vertex& vertex,
   for (size_t itrk = 0; itrk < vertex.trkSvtxId.size(); itrk++) {
     std::cout<<"ient : "<<ient <<"  ijet : "<<ijet << txt << "vertex number: "<<vtxnb<<"  track original vertex : "<< vertex.trkSvtxId[itrk] <<"    and track original status : "<<vertex.trkMatchSta[itrk] << " pT = " << vertex.tracks[itrk].Pt() <<  std::endl;
   }
+}
+
+int dominantHeavyFlavorStatus(const Vertex& vertex) {
+  std::map<int, double> ptByStatus;
+  for (size_t i = 0; i < vertex.tracks.size(); ++i) {
+    const int status = vertex.trkMatchSta[i];
+    if (status < 100) continue;
+    ptByStatus[status] += vertex.tracks[i].Pt();
+  }
+
+  int bestStatus = 0;
+  double bestPt = -1.0;
+  for (const auto& kv : ptByStatus) {
+    if (kv.second > bestPt) {
+      bestPt = kv.second;
+      bestStatus = kv.first;
+    }
+  }
+  return bestStatus;
+}
+
+RecoSvTruthComposition truthComposition(const Vertex& vertex) {
+  RecoSvTruthComposition comp;
+  comp.nTracks = static_cast<int>(vertex.tracks.size());
+  const int dominantStatus = dominantHeavyFlavorStatus(vertex);
+  int dominantStatusTracks = 0;
+
+  for (size_t i = 0; i < vertex.tracks.size(); ++i) {
+    const int status = vertex.trkMatchSta[i];
+    const double pt = vertex.tracks[i].Pt();
+    comp.totalTrackPt += pt;
+
+    if (status >= 100) {
+      comp.nHfTracks += 1;
+      comp.hfTrackPt += pt;
+    }
+    if (dominantStatus >= 100 && status == dominantStatus) {
+      dominantStatusTracks += 1;
+      comp.dominantStatusTrackPt += pt;
+    }
+  }
+
+  if (comp.nTracks > 0) {
+    comp.hfTrackPurity = static_cast<double>(comp.nHfTracks) / static_cast<double>(comp.nTracks);
+    comp.dominantStatusTrackPurity = static_cast<double>(dominantStatusTracks) / static_cast<double>(comp.nTracks);
+  }
+  if (comp.totalTrackPt > 0.0) {
+    comp.hfPtPurity = comp.hfTrackPt / comp.totalTrackPt;
+    comp.dominantStatusPtPurity = comp.dominantStatusTrackPt / comp.totalTrackPt;
+  }
+  if (comp.hfTrackPt > 0.0) {
+    comp.dominantStatusPtOverHfPt = comp.dominantStatusTrackPt / comp.hfTrackPt;
+  }
+  return comp;
+}
+
+bool statusHasMatchedSv(const tTree& t, Int_t ijet, int status) {
+  if (status < 100) return false;
+  for (Int_t itrk = 0; itrk < t.ntrk; ++itrk) {
+    if (t.trkJetId[itrk] != ijet) continue;
+    if (t.trkMatchSta[itrk] != status) continue;
+    if (t.trkSvtxId[itrk] >= 0) return true;
+  }
+  return false;
 }
 
 // - SkipMC functions will not be needed adter the new update of centralzied selections 
@@ -440,7 +517,9 @@ vector<ROOT::Math::PtEtaPhiMVector> makeSvtxs_withBDT(
   double& nb_sv ,    //   ..      ..           ..     ..    ..   1
   double& sv_fail,
   double& merge_fail,
-  TH1D* h_score_bkg, TH1D* h_score_sg
+  TH1D* h_score_bkg, TH1D* h_score_sg,
+  std::vector<int>* recoStatusOut = nullptr,
+  std::vector<RecoSvTruthComposition>* recoCompositionOut = nullptr
 ){
 
   ///// Notes: 
@@ -609,6 +688,16 @@ vector<ROOT::Math::PtEtaPhiMVector> makeSvtxs_withBDT(
     vector<ROOT::Math::PtEtaPhiMVector> vecFinalSecVtxs;
     vecFinalSecVtxs.push_back(vertices[0].p4);
     vecFinalSecVtxs.push_back(vertices[1].p4);
+    if (recoStatusOut) {
+      recoStatusOut->clear();
+      recoStatusOut->push_back(dominantHeavyFlavorStatus(vertices[0]));
+      recoStatusOut->push_back(dominantHeavyFlavorStatus(vertices[1]));
+    }
+    if (recoCompositionOut) {
+      recoCompositionOut->clear();
+      recoCompositionOut->push_back(truthComposition(vertices[0]));
+      recoCompositionOut->push_back(truthComposition(vertices[1]));
+    }
 
     return vecFinalSecVtxs;
 }
@@ -633,27 +722,58 @@ struct AggBHadronNtupleRow {
   Long64_t entry;
   Int_t run, lumi, evt, jetIndex;
   Float_t weight, jtpt, jteta, refpt, refeta;
-  Int_t jtNbHad;
-  Float_t btagScore;
+  Int_t jtNbHad, jtNcHad;
+  Float_t btagScore, jetProbability, wrongJetProbability;
   Int_t passRecoKin, passGenKin, passBtag, nRecoAgg, nGenAgg, genStatus1, genStatus2;
+  Int_t recoStatus1, recoStatus2, fullBStatus1, fullBStatus2;
+  Int_t fullBHasMatchedSv1, fullBHasMatchedSv2;
+  Int_t genHasMatchedSv1, genHasMatchedSv2;
+  Int_t recoStatusHasMatchedSv1, recoStatusHasMatchedSv2;
+  Int_t recoSvNtrk1, recoSvNtrk2, recoSvNHfTrk1, recoSvNHfTrk2;
+  Float_t recoSvTotalTrackPt1, recoSvTotalTrackPt2;
+  Float_t recoSvHfTrackPt1, recoSvHfTrackPt2;
+  Float_t recoSvDominantStatusTrackPt1, recoSvDominantStatusTrackPt2;
+  Float_t recoSvHfTrackPurity1, recoSvHfTrackPurity2;
+  Float_t recoSvDominantStatusTrackPurity1, recoSvDominantStatusTrackPurity2;
+  Float_t recoSvHfPtPurity1, recoSvHfPtPurity2;
+  Float_t recoSvDominantStatusPtPurity1, recoSvDominantStatusPtPurity2;
+  Float_t recoSvDominantStatusPtOverHfPt1, recoSvDominantStatusPtOverHfPt2;
   Float_t recoPt1, recoEta1, recoPhi1, recoM1, recoPt2, recoEta2, recoPhi2, recoM2, recoDr, recoMB, recoEec, genPt1, genEta1, genPhi1, genM1, genPt2, genEta2, genPhi2, genM2, genDr, genMB, genEec;
+  Float_t fullBPt1, fullBEta1, fullBPhi1, fullBJetDr1;
+  Float_t fullBPt2, fullBEta2, fullBPhi2, fullBJetDr2;
 
   void reset() {
     entry = -1;
     run = lumi = evt = jetIndex = -1;
     weight = 1.0;
     jtpt = jteta = refpt = refeta = -999.0;
-    jtNbHad = -1;
-    btagScore = -999.0;
+    jtNbHad = jtNcHad = -1;
+    btagScore = jetProbability = wrongJetProbability = -999.0;
     passRecoKin = passGenKin = passBtag = 0;
     nRecoAgg = nGenAgg = 0;
     genStatus1 = genStatus2 = 0;
+    recoStatus1 = recoStatus2 = 0;
+    fullBStatus1 = fullBStatus2 = 0;
+    fullBHasMatchedSv1 = fullBHasMatchedSv2 = 0;
+    genHasMatchedSv1 = genHasMatchedSv2 = 0;
+    recoStatusHasMatchedSv1 = recoStatusHasMatchedSv2 = 0;
+    recoSvNtrk1 = recoSvNtrk2 = recoSvNHfTrk1 = recoSvNHfTrk2 = 0;
+    recoSvTotalTrackPt1 = recoSvTotalTrackPt2 = 0.0;
+    recoSvHfTrackPt1 = recoSvHfTrackPt2 = 0.0;
+    recoSvDominantStatusTrackPt1 = recoSvDominantStatusTrackPt2 = 0.0;
+    recoSvHfTrackPurity1 = recoSvHfTrackPurity2 = 0.0;
+    recoSvDominantStatusTrackPurity1 = recoSvDominantStatusTrackPurity2 = 0.0;
+    recoSvHfPtPurity1 = recoSvHfPtPurity2 = 0.0;
+    recoSvDominantStatusPtPurity1 = recoSvDominantStatusPtPurity2 = 0.0;
+    recoSvDominantStatusPtOverHfPt1 = recoSvDominantStatusPtOverHfPt2 = 0.0;
     recoPt1 = recoEta1 = recoPhi1 = recoM1 = -999.0;
     recoPt2 = recoEta2 = recoPhi2 = recoM2 = -999.0;
     recoDr = recoMB = recoEec = -999.0;
     genPt1 = genEta1 = genPhi1 = genM1 = -999.0;
     genPt2 = genEta2 = genPhi2 = genM2 = -999.0;
     genDr = genMB = genEec = -999.0;
+    fullBPt1 = fullBEta1 = fullBPhi1 = fullBJetDr1 = -999.0;
+    fullBPt2 = fullBEta2 = fullBPhi2 = fullBJetDr2 = -999.0;
   }
 };
 
@@ -669,7 +789,10 @@ void makeAggBHadronBranches(TTree* tree, AggBHadronNtupleRow& row) {
   tree->Branch("refpt", &row.refpt, "refpt/F");
   tree->Branch("refeta", &row.refeta, "refeta/F");
   tree->Branch("jtNbHad", &row.jtNbHad, "jtNbHad/I");
+  tree->Branch("jtNcHad", &row.jtNcHad, "jtNcHad/I");
   tree->Branch("btagScore", &row.btagScore, "btagScore/F");
+  tree->Branch("jetProbability", &row.jetProbability, "jetProbability/F");
+  tree->Branch("wrongJetProbability", &row.wrongJetProbability, "wrongJetProbability/F");
   tree->Branch("passRecoKin", &row.passRecoKin, "passRecoKin/I");
   tree->Branch("passGenKin", &row.passGenKin, "passGenKin/I");
   tree->Branch("passBtag", &row.passBtag, "passBtag/I");
@@ -677,6 +800,36 @@ void makeAggBHadronBranches(TTree* tree, AggBHadronNtupleRow& row) {
   tree->Branch("nGenAgg", &row.nGenAgg, "nGenAgg/I");
   tree->Branch("genStatus1", &row.genStatus1, "genStatus1/I");
   tree->Branch("genStatus2", &row.genStatus2, "genStatus2/I");
+  tree->Branch("recoStatus1", &row.recoStatus1, "recoStatus1/I");
+  tree->Branch("recoStatus2", &row.recoStatus2, "recoStatus2/I");
+  tree->Branch("fullBStatus1", &row.fullBStatus1, "fullBStatus1/I");
+  tree->Branch("fullBStatus2", &row.fullBStatus2, "fullBStatus2/I");
+  tree->Branch("fullBHasMatchedSv1", &row.fullBHasMatchedSv1, "fullBHasMatchedSv1/I");
+  tree->Branch("fullBHasMatchedSv2", &row.fullBHasMatchedSv2, "fullBHasMatchedSv2/I");
+  tree->Branch("genHasMatchedSv1", &row.genHasMatchedSv1, "genHasMatchedSv1/I");
+  tree->Branch("genHasMatchedSv2", &row.genHasMatchedSv2, "genHasMatchedSv2/I");
+  tree->Branch("recoStatusHasMatchedSv1", &row.recoStatusHasMatchedSv1, "recoStatusHasMatchedSv1/I");
+  tree->Branch("recoStatusHasMatchedSv2", &row.recoStatusHasMatchedSv2, "recoStatusHasMatchedSv2/I");
+  tree->Branch("recoSvNtrk1", &row.recoSvNtrk1, "recoSvNtrk1/I");
+  tree->Branch("recoSvNtrk2", &row.recoSvNtrk2, "recoSvNtrk2/I");
+  tree->Branch("recoSvNHfTrk1", &row.recoSvNHfTrk1, "recoSvNHfTrk1/I");
+  tree->Branch("recoSvNHfTrk2", &row.recoSvNHfTrk2, "recoSvNHfTrk2/I");
+  tree->Branch("recoSvTotalTrackPt1", &row.recoSvTotalTrackPt1, "recoSvTotalTrackPt1/F");
+  tree->Branch("recoSvTotalTrackPt2", &row.recoSvTotalTrackPt2, "recoSvTotalTrackPt2/F");
+  tree->Branch("recoSvHfTrackPt1", &row.recoSvHfTrackPt1, "recoSvHfTrackPt1/F");
+  tree->Branch("recoSvHfTrackPt2", &row.recoSvHfTrackPt2, "recoSvHfTrackPt2/F");
+  tree->Branch("recoSvDominantStatusTrackPt1", &row.recoSvDominantStatusTrackPt1, "recoSvDominantStatusTrackPt1/F");
+  tree->Branch("recoSvDominantStatusTrackPt2", &row.recoSvDominantStatusTrackPt2, "recoSvDominantStatusTrackPt2/F");
+  tree->Branch("recoSvHfTrackPurity1", &row.recoSvHfTrackPurity1, "recoSvHfTrackPurity1/F");
+  tree->Branch("recoSvHfTrackPurity2", &row.recoSvHfTrackPurity2, "recoSvHfTrackPurity2/F");
+  tree->Branch("recoSvDominantStatusTrackPurity1", &row.recoSvDominantStatusTrackPurity1, "recoSvDominantStatusTrackPurity1/F");
+  tree->Branch("recoSvDominantStatusTrackPurity2", &row.recoSvDominantStatusTrackPurity2, "recoSvDominantStatusTrackPurity2/F");
+  tree->Branch("recoSvHfPtPurity1", &row.recoSvHfPtPurity1, "recoSvHfPtPurity1/F");
+  tree->Branch("recoSvHfPtPurity2", &row.recoSvHfPtPurity2, "recoSvHfPtPurity2/F");
+  tree->Branch("recoSvDominantStatusPtPurity1", &row.recoSvDominantStatusPtPurity1, "recoSvDominantStatusPtPurity1/F");
+  tree->Branch("recoSvDominantStatusPtPurity2", &row.recoSvDominantStatusPtPurity2, "recoSvDominantStatusPtPurity2/F");
+  tree->Branch("recoSvDominantStatusPtOverHfPt1", &row.recoSvDominantStatusPtOverHfPt1, "recoSvDominantStatusPtOverHfPt1/F");
+  tree->Branch("recoSvDominantStatusPtOverHfPt2", &row.recoSvDominantStatusPtOverHfPt2, "recoSvDominantStatusPtOverHfPt2/F");
   tree->Branch("recoPt1", &row.recoPt1, "recoPt1/F");
   tree->Branch("recoEta1", &row.recoEta1, "recoEta1/F");
   tree->Branch("recoPhi1", &row.recoPhi1, "recoPhi1/F");
@@ -699,6 +852,14 @@ void makeAggBHadronBranches(TTree* tree, AggBHadronNtupleRow& row) {
   tree->Branch("genDr", &row.genDr, "genDr/F");
   tree->Branch("genMB", &row.genMB, "genMB/F");
   tree->Branch("genEec", &row.genEec, "genEec/F");
+  tree->Branch("fullBPt1", &row.fullBPt1, "fullBPt1/F");
+  tree->Branch("fullBEta1", &row.fullBEta1, "fullBEta1/F");
+  tree->Branch("fullBPhi1", &row.fullBPhi1, "fullBPhi1/F");
+  tree->Branch("fullBJetDr1", &row.fullBJetDr1, "fullBJetDr1/F");
+  tree->Branch("fullBPt2", &row.fullBPt2, "fullBPt2/F");
+  tree->Branch("fullBEta2", &row.fullBEta2, "fullBEta2/F");
+  tree->Branch("fullBPhi2", &row.fullBPhi2, "fullBPhi2/F");
+  tree->Branch("fullBJetDr2", &row.fullBJetDr2, "fullBJetDr2/F");
 }
 
 void fill_jk_resampling_response_1D(std::vector<RooUnfoldResponse *> responses, double num, 
@@ -803,7 +964,7 @@ void filter_b_bb(Int_t RunN,TString filename, TString output_folder, TString out
     int counter2 = 0 ;  
 
   std::vector<TString> active_branches = {
-    "weight","jtpt", "pthat", "jteta", "jtphi", "jtm", "nref", "jtmB", "jtNbHad", "jtHadFlav", "discr_particleNet_BvsAll", "jtNtrk",
+    "weight","jtpt", "pthat", "jteta", "jtphi", "jtm", "nref", "jtmB", "jtNbHad", "jtNcHad", "jtHadFlav", "discr_particleNet_BvsAll", "discr_pfWrongJP", "jtNtrk",
       "ntrk", "trkJetId", "trkBdtScore", "trkPdgId", "trkMatchPdgId", "trkMatchSta", "trkPt", "trkEta", "trkPhi",
       "refTrkPdgId","refTrkSta", "refTrkMass",  "refmB", "refpt", "refeta", "refphi",
       "nrefTrk", "refTrkJetId", "refTrkPt", "refTrkEta", "refTrkPhi", "refTrkY", "refNtrk",
@@ -1597,7 +1758,7 @@ void Build_templates(const AnalysisConfig& cfg, bool isMakeTemplates = true, boo
 	TH1D* h_ptratio     = new TH1D("h_ptratio", "reco/gen SV p_{T};p_{T}^{reco}/p_{T}^{gen};entries", 60, 0., 2.);
 	h_svpt_vs_bpt->Sumw2();
 	h_ptratio->Sumw2();
-	const bool doAggNtuple = makeAggNtuple && cfg.dataset.isMC;
+	const bool doAggNtuple = makeAggNtuple;
 	TFile* fout_agg = nullptr;
 	TTree* aggBHadronTree = nullptr;
 	AggBHadronNtupleRow aggRow;
@@ -1853,17 +2014,17 @@ void Build_templates(const AnalysisConfig& cfg, bool isMakeTemplates = true, boo
               } // end if 2 SV 
 
 
-    /////////---- To Prepare Response matrix (of true >=2B) ---- ONLY for MC (both RECO, GEN) ----
-	          if((isCreateRmatrix || doAggNtuple) && cfg.dataset.isMC && t.jtNbHad[ijet] >= 2)  // -- select jets of 2b (truth)
+    /////////---- Response matrix (MC truth) and/or diagnostic agg ntuple (data+MC) ----
+	          if ((cfg.dataset.isMC && isCreateRmatrix && t.jtNbHad[ijet] >= 2) || doAggNtuple)
           { 
 
             // -- common variables repeatdly used in fill histograms
             // jtpt_fill() folds jets above the last bin edge into that bin, so they are
             // not lost to the overflow bin (see binning_histos_small.h).
             double jpt_reco = jtpt_fill(reco_jet_pt(t, ijet));
-            double jpt_gen = jtpt_fill(gen_jet_pt(t, ijet));
+            double jpt_gen = cfg.dataset.isMC ? jtpt_fill(gen_jet_pt(t, ijet)) : -999.0;
             double jeta_reco = reco_jet_eta(t, ijet);
-            double jeta_gen = gen_jet_eta(t, ijet);
+            double jeta_gen = cfg.dataset.isMC ? gen_jet_eta(t, ijet) : -999.0;
             // -- for cout only
             double btagVar =  (cfg.dataset.RunN == 2) ? (t.discr_particleNet_BvsAll[ijet]) :
                               ( (cfg.dataset.RunN == 3) ? 
@@ -1872,8 +2033,21 @@ void Build_templates(const AnalysisConfig& cfg, bool isMakeTemplates = true, boo
                                   t.discr_unifiedParticleTransformer_probbb[ijet]) :
 	                                  -1);
 
-	            // -- counts stats
-	            n_bb_jets++; // true >=2b jets 
+		            // -- counts stats
+		            if (cfg.dataset.isMC && t.jtNbHad[ijet] >= 2) n_bb_jets++; // true >=2b jets
+
+                double row_weight = weight_tree;
+                if (cfg.dataset.RunN == 3 && !cfg.dataset.isMC &&
+                    t.HLT_AK4PFJet60_v8 &&
+                    !(t.HLT_AK4PFJet80_v8 || t.HLT_AK4PFJet100_v8 || t.HLT_AK4PFJet120_v8)) {
+                  row_weight *= prescale;
+                }
+                if (cfg.dataset.RunN == 2 && !cfg.dataset.isMC &&
+                    t.HLT_HIAK4PFJet40_v1 &&
+                    !(t.HLT_HIAK4PFJet60_v1 || t.HLT_HIAK4PFJet80_v1 ||
+                      t.HLT_HIAK4PFJet100_v1)) {
+                  row_weight *= prescale;
+                }
 
 	            aggRow.reset();
 	            aggRow.entry = ient;
@@ -1881,21 +2055,26 @@ void Build_templates(const AnalysisConfig& cfg, bool isMakeTemplates = true, boo
 	            aggRow.lumi = t.lumi;
 	            aggRow.evt = t.evt;
 	            aggRow.jetIndex = ijet;
-	            aggRow.weight = weight_tree;
+	            aggRow.weight = row_weight;
 	            aggRow.jtpt = jpt_reco;
 	            aggRow.jteta = jeta_reco;
 	            aggRow.refpt = jpt_gen;
 	            aggRow.refeta = jeta_gen;
-	            aggRow.jtNbHad = t.jtNbHad[ijet];
+	            aggRow.jtNbHad = cfg.dataset.isMC ? t.jtNbHad[ijet] : -1;
+	            aggRow.jtNcHad = cfg.dataset.isMC ? t.jtNcHad[ijet] : -1;
 	            aggRow.btagScore = btagVar;
+	            aggRow.jetProbability = t.discr_pfJP[ijet];
+	            aggRow.wrongJetProbability =
+	                (cfg.dataset.isMC && t.tree && t.tree->GetBranch("discr_pfWrongJP")) ?
+	                t.discr_pfWrongJP[ijet] : t.discr_pfJP[ijet];
 	            aggRow.passRecoKin = passRecoJetKinematics(t, ijet, cfg);
-	            aggRow.passGenKin = passGenJetKinematics(t, ijet, cfg);
+	            aggRow.passGenKin = cfg.dataset.isMC ? passGenJetKinematics(t, ijet, cfg) : 0;
 	            aggRow.passBtag = passBtag(t, ijet, cfg);
 
 	                // step1: for Response matrix ---- Gen b hadrons ----
 	                std::vector<ROOT::Math::PtEtaPhiMVector> gen_bh;
 	                std::vector<Int_t> gen_bh_sta;
-	                PartialBsAggregation(gen_bh, gen_bh_sta, t, ijet);
+	                if (cfg.dataset.isMC) PartialBsAggregation(gen_bh, gen_bh_sta, t, ijet);
 	                aggRow.nGenAgg = gen_bh.size();
 	                // MEASUREMENT DEFINITION: "bb with a well-defined 2-gen-B observable;
 	                // rest are fakes". A reco jet with < 2 aggregatable gen B-hadrons has a
@@ -1938,6 +2117,29 @@ void Build_templates(const AnalysisConfig& cfg, bool isMakeTemplates = true, boo
 	                aggRow.genDr = dr_gen;
 	                aggRow.genMB = mB_gen;
 	                aggRow.genEec = eec_gen;
+	                aggRow.genHasMatchedSv1 = statusHasMatchedSv(t, ijet, aggRow.genStatus1);
+	                aggRow.genHasMatchedSv2 = statusHasMatchedSv(t, ijet, aggRow.genStatus2);
+	                for (Int_t ifullB = 0; ifullB < t.nfullB; ++ifullB) {
+	                  if (t.fullBJetId[ifullB] != ijet) continue;
+	                  if (t.fullBSta[ifullB] == aggRow.genStatus1) {
+	                    aggRow.fullBStatus1 = t.fullBSta[ifullB];
+	                    aggRow.fullBPt1 = t.fullBPt[ifullB];
+	                    aggRow.fullBEta1 = t.fullBEta[ifullB];
+	                    aggRow.fullBPhi1 = t.fullBPhi[ifullB];
+	                    aggRow.fullBJetDr1 = t.calc_dr(t.fullBEta[ifullB], t.fullBPhi[ifullB],
+	                                                    jeta_reco, t.jtphi[ijet]);
+	                    aggRow.fullBHasMatchedSv1 = statusHasMatchedSv(t, ijet, t.fullBSta[ifullB]);
+	                  }
+	                  if (t.fullBSta[ifullB] == aggRow.genStatus2) {
+	                    aggRow.fullBStatus2 = t.fullBSta[ifullB];
+	                    aggRow.fullBPt2 = t.fullBPt[ifullB];
+	                    aggRow.fullBEta2 = t.fullBEta[ifullB];
+	                    aggRow.fullBPhi2 = t.fullBPhi[ifullB];
+	                    aggRow.fullBJetDr2 = t.calc_dr(t.fullBEta[ifullB], t.fullBPhi[ifullB],
+	                                                    jeta_reco, t.jtphi[ijet]);
+	                    aggRow.fullBHasMatchedSv2 = statusHasMatchedSv(t, ijet, t.fullBSta[ifullB]);
+	                  }
+	                }
 					// overflow treatement at gen level	
 				    mB_gen_fill = mB_gen; dr_gen_fill = dr_gen;
                 if (mB_gen_fill >= mb_max) mB_gen_fill = mb_max_fill;
@@ -1946,7 +2148,13 @@ void Build_templates(const AnalysisConfig& cfg, bool isMakeTemplates = true, boo
 			  
 			  // -- Prepare combined b-tagger: 
         // ---- Reco SVs ----
-        vector<ROOT::Math::PtEtaPhiMVector> reco_sv_rm = makeSvtxs_withBDT(t, ijet, ient, agg_fail_rm, nb_sv_rm, sv_fail_rm, merge_fail_rm, nullptr, nullptr);
+        std::vector<int> reco_sv_status_rm;
+        std::vector<RecoSvTruthComposition> reco_sv_composition_rm;
+        vector<ROOT::Math::PtEtaPhiMVector> reco_sv_rm =
+            makeSvtxs_withBDT(t, ijet, ient, agg_fail_rm, nb_sv_rm, sv_fail_rm,
+                              merge_fail_rm, nullptr, nullptr,
+                              cfg.dataset.isMC ? &reco_sv_status_rm : nullptr,
+                              cfg.dataset.isMC ? &reco_sv_composition_rm : nullptr);
 				  
 	      bool reco_sv_ok = (reco_sv_rm.size() == 2);
 	      aggRow.nRecoAgg = reco_sv_rm.size();
@@ -1967,9 +2175,43 @@ void Build_templates(const AnalysisConfig& cfg, bool isMakeTemplates = true, boo
 	        aggRow.recoDr = dr_reco_diag;
 	        aggRow.recoMB = mB_reco_diag;
 	        aggRow.recoEec = eec_reco_diag;
+	        if (cfg.dataset.isMC && reco_sv_status_rm.size() > 0) {
+	          aggRow.recoStatus1 = reco_sv_status_rm[0];
+	          aggRow.recoStatusHasMatchedSv1 = statusHasMatchedSv(t, ijet, aggRow.recoStatus1);
+	        }
+	        if (cfg.dataset.isMC && reco_sv_status_rm.size() > 1) {
+	          aggRow.recoStatus2 = reco_sv_status_rm[1];
+	          aggRow.recoStatusHasMatchedSv2 = statusHasMatchedSv(t, ijet, aggRow.recoStatus2);
+	        }
+	        if (cfg.dataset.isMC && reco_sv_composition_rm.size() > 0) {
+	          aggRow.recoSvNtrk1 = reco_sv_composition_rm[0].nTracks;
+	          aggRow.recoSvNHfTrk1 = reco_sv_composition_rm[0].nHfTracks;
+	          aggRow.recoSvTotalTrackPt1 = reco_sv_composition_rm[0].totalTrackPt;
+	          aggRow.recoSvHfTrackPt1 = reco_sv_composition_rm[0].hfTrackPt;
+	          aggRow.recoSvDominantStatusTrackPt1 = reco_sv_composition_rm[0].dominantStatusTrackPt;
+	          aggRow.recoSvHfTrackPurity1 = reco_sv_composition_rm[0].hfTrackPurity;
+	          aggRow.recoSvDominantStatusTrackPurity1 = reco_sv_composition_rm[0].dominantStatusTrackPurity;
+	          aggRow.recoSvHfPtPurity1 = reco_sv_composition_rm[0].hfPtPurity;
+	          aggRow.recoSvDominantStatusPtPurity1 = reco_sv_composition_rm[0].dominantStatusPtPurity;
+	          aggRow.recoSvDominantStatusPtOverHfPt1 = reco_sv_composition_rm[0].dominantStatusPtOverHfPt;
+	        }
+	        if (cfg.dataset.isMC && reco_sv_composition_rm.size() > 1) {
+	          aggRow.recoSvNtrk2 = reco_sv_composition_rm[1].nTracks;
+	          aggRow.recoSvNHfTrk2 = reco_sv_composition_rm[1].nHfTracks;
+	          aggRow.recoSvTotalTrackPt2 = reco_sv_composition_rm[1].totalTrackPt;
+	          aggRow.recoSvHfTrackPt2 = reco_sv_composition_rm[1].hfTrackPt;
+	          aggRow.recoSvDominantStatusTrackPt2 = reco_sv_composition_rm[1].dominantStatusTrackPt;
+	          aggRow.recoSvHfTrackPurity2 = reco_sv_composition_rm[1].hfTrackPurity;
+	          aggRow.recoSvDominantStatusTrackPurity2 = reco_sv_composition_rm[1].dominantStatusTrackPurity;
+	          aggRow.recoSvHfPtPurity2 = reco_sv_composition_rm[1].hfPtPurity;
+	          aggRow.recoSvDominantStatusPtPurity2 = reco_sv_composition_rm[1].dominantStatusPtPurity;
+	          aggRow.recoSvDominantStatusPtOverHfPt2 = reco_sv_composition_rm[1].dominantStatusPtOverHfPt;
+	        }
 	      }
 	    if (aggBHadronTree) aggBHadronTree->Fill();
-	    if (!isCreateRmatrix) continue;
+	    // Diagnostic ntuples may contain data and all MC jet flavors.  The response,
+	    // purity, and efficiency definitions below remain restricted to truth bb jets.
+	    if (!isCreateRmatrix || !cfg.dataset.isMC || t.jtNbHad[ijet] < 2) continue;
 
 	    // Combined SV-reco + b-tag efficiency: DENOMINATOR = all true 2b jets, filled
 	    // BEFORE the 2-SV cut. Gen-EEC weighted (eec_gen exists for every gen_ok jet,
