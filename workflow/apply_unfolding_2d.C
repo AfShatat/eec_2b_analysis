@@ -111,17 +111,23 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
     const Color_t orange = ROCColor::orange();
     const Color_t teal = ROCColor::teal();
 
-    TString filename_template_fit = "/home/llr/cms/zaidan/analysis_lise/eec_2b_analysis/TemplateFit_Run3/TemplateFits_Run3_minHLT60_LinearBin/nominal_Run3_TemplateFits_histos_3d_80_inf.root";
+    // ---- disabled (kept for reference): UParT v1 / negTag inputs, WP 0.868 ----
+    // TString filename_template_fit = "/home/llr/cms/zaidan/analysis_lise/eec_2b_analysis/TemplateFit_Run3/TemplateFits_Run3_minHLT60_LinearBin/nominal_Run3_TemplateFits_histos_3d_80_inf.root";
+    // TString filename_response = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/RMatrix_Run3_btagWP868_template_for_fit_histos_3D_qcd_f_80_120_2.root";
+    // filename_data (data) = ".../HardProbes/agg_template_chunks/Run3_btagWP868_template_for_fit_histos_3D_data_f_80_120_2MCGEN.root"
+    // filename_data (MC)   = ".../QCD/agg_ntuple_chunks/Run3_btagWP868_template_for_fit_histos_3D_qcd_f_80_120_2MCGEN.root"
+
+    TString filename_template_fit = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/results/TemplateFits_Run3_minHLT60_LinearBin_upartv2/nominal_Run3_TemplateFits_histos_3d_80_inf.root";
     std::cout << "Using template file: " << filename_template_fit << std::endl;
 
-    TString filename_response = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/RMatrix_Run3_btagWP868_template_for_fit_histos_3D_qcd_f_80_120_2.root";///data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/RMatrix_Run3_btagWP868_template_for_fit_histos_3D_qcd_f.root";  //RMatrix_Run3_btagWP868_template_for_fit_histos_3D_qcd_f.root"; //folder + "RMatrix_Run3_btagWP868_template_for_fit_histos_3D_qcd_f.root";
+    TString filename_response = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/RMatrix_Run3_btagWP872_template_for_fit_histos_3D_qcd_f_80_120_2_upartv2.root";
     std::cout << "Using response file: " << filename_response << std::endl;
 
     // Modes 0/1 unfold MC (h3D_bb / h3D_pseudodata_bb), which live in the MCGEN file.
     // Mode 2 unfolds real data from the data file.
     TString filename_data = is_data
-        ? "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/HardProbes/agg_template_chunks/Run3_btagWP868_template_for_fit_histos_3D_data_f_80_120_2MCGEN.root"
-        : "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/Run3_btagWP868_template_for_fit_histos_3D_qcd_f_80_120_2MCGEN.root";
+        ? "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/HardProbes/agg_template_chunks/Run3_btagWP872_template_for_fit_histos_3D_data_f_80_120_2MCGEN_upartv2.root"
+        : "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/Run3_btagWP872_template_for_fit_histos_3D_qcd_f_80_120_2MCGEN_upartv2.root";
     std::cout << "Getting data from " << filename_data << std::endl; //
     //Select central pT bin
     int ibin_pt = 2;
@@ -310,11 +316,12 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
     //std::cout << "underflowY=" << underflowY << " overflowY=" << overflowY << std::endl;
 
     // ---- Scan the Bayesian iteration count, one PDF page per value (only when scan_niter).
-    TString home_llr = "/home/llr/cms/zaidan/";                       // LLR home directory
+    // ---- disabled (kept for reference): iteration scan output in the LLR home dir ----
+    // TString home_llr = "/home/llr/cms/zaidan/";
     // label already encodes the option flags (_bayesian / _split_test / _nopurity), so toggling
     // those bools writes to distinct files instead of overwriting the previous run's outputs.
-    TString iter_pdf = home_llr + "bayesian_unfolding_iterations_" + label + ".pdf";  // multi-page PDF of all iterations
-    TString png_dir  = home_llr + "bayesian_unfolding_iterations_" + label + "_png/"; // one PNG per iteration lands here
+    TString iter_pdf = folder + "bayesian_unfolding_iterations_" + label + ".pdf";  // multi-page PDF of all iterations
+    TString png_dir  = folder + "bayesian_unfolding_iterations_" + label + "_png/"; // one PNG per iteration lands here
     if (scan_niter) gSystem->mkdir(png_dir, kTRUE);                     // create the PNG folder if it does not exist
     const int niter_min = 0;
     const int niter_max = scan_niter ? 49 : 0;   // scan niter = 1..niter_max+1; one pass when not scanning
@@ -1223,7 +1230,7 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
         pad_c2->RedrawAxis();
 
         // Next to the per-iteration scan outputs, which this plot summarises.
-        TString reg_stem = home_llr + "refolding_pvalue_vs_iteration_" + label;
+        TString reg_stem = folder + "refolding_pvalue_vs_iteration_" + label;
         c_reg->Print(reg_stem + ".pdf");
         c_reg->Print(reg_stem + ".png");
 
@@ -1249,7 +1256,10 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
 // e.g.  root -l 'apply_unfolding_2d.C(2, true, true)'   // data, Bayesian, scan the iterations
 void apply_unfolding_2d(int test_mode = 2, bool unfoldBayes = true, bool scan_niter = false){
     TString dataset = "data";
-    TString folder = "/data_CMS/cms/zaidan/analysis_lise/Run3/";
+    // ---- disabled (kept for reference): previous output location ----
+    // TString folder = "/data_CMS/cms/zaidan/analysis_lise/Run3/";
+    TString folder = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/results/unfolding_upartv2/";
+    gSystem->mkdir(folder, kTRUE);
     TString pT_selection = "80_inf";
     bool btag = true;
     Int_t n = 1;

@@ -1890,8 +1890,11 @@ void template_fit(){
     if (RunN == 3){
         alsoLowEG = false; 
         also_bjet = false;
-        dataset_HG = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/HardProbes/agg_template_chunks/Run3_btagWP868_template_for_fit_histos_3D_data_f_80_120_2MCGEN.root";
-        templates_dijet = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/Run3_btagWP868_template_for_fit_histos_3D_qcd_f_80_120_2MCGEN.root";
+        // ---- disabled (kept for reference): UParT v1 / negTag inputs, WP 0.868 ----
+        // dataset_HG = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/HardProbes/agg_template_chunks/Run3_btagWP868_template_for_fit_histos_3D_data_f_80_120_2MCGEN.root";
+        // templates_dijet = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/Run3_btagWP868_template_for_fit_histos_3D_qcd_f_80_120_2MCGEN.root";
+        dataset_HG = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/HardProbes/agg_template_chunks/Run3_btagWP872_template_for_fit_histos_3D_data_f_80_120_2MCGEN_upartv2.root";
+        templates_dijet = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/Run3_btagWP872_template_for_fit_histos_3D_qcd_f_80_120_2MCGEN_upartv2.root";
         fout_name = Form("Run%d_TemplateFits_histos_3d_%s.root", RunN, pT_selection.Data());
     }
     else if (RunN == 2){

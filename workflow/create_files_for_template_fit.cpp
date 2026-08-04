@@ -803,7 +803,8 @@ void filter_b_bb(Int_t RunN,TString filename, TString output_folder, TString out
     int counter2 = 0 ;  
 
   std::vector<TString> active_branches = {
-    "weight","jtpt", "pthat", "jteta", "jtphi", "jtm", "nref", "jtmB", "jtNbHad", "jtHadFlav", "discr_particleNet_BvsAll", "jtNtrk",
+    // "jtm" disabled (kept for reference): absent from the UParTV2 forests
+    "weight","jtpt", "pthat", "jteta", "jtphi", "nref", "jtmB", "jtNbHad", "jtHadFlav", "discr_particleNet_BvsAll", "jtNtrk",
       "ntrk", "trkJetId", "trkBdtScore", "trkPdgId", "trkMatchPdgId", "trkMatchSta", "trkPt", "trkEta", "trkPhi",
       "refTrkPdgId","refTrkSta", "refTrkMass",  "refmB", "refpt", "refeta", "refphi",
       "nrefTrk", "refTrkJetId", "refTrkPt", "refTrkEta", "refTrkPhi", "refTrkY", "refNtrk",

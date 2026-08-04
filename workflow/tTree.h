@@ -560,8 +560,10 @@ void tTree::Init(TString rootf, Int_t dataType, Int_t RunN)
    tree->SetBranchAddress("jteta", jteta, &b_jteta);
    tree->SetBranchAddress("jty", jty, &b_jty);
    tree->SetBranchAddress("jtphi", jtphi, &b_jtphi);
+   /* ---- disabled (kept for reference): jtpu / jtm, absent from the UParTV2 forests ----
    tree->SetBranchAddress("jtpu", jtpu, &b_jtpu);
    tree->SetBranchAddress("jtm", jtm, &b_jtm);
+   ---- */
    tree->SetBranchAddress("jtarea", jtarea, &b_jtarea);
    tree->SetBranchAddress("jtPfCHF", jtPfCHF, &b_jtPfCHF);
    tree->SetBranchAddress("jtPfNHF", jtPfNHF, &b_jtPfNHF);
@@ -573,9 +575,11 @@ void tTree::Init(TString rootf, Int_t dataType, Int_t RunN)
    tree->SetBranchAddress("jtPfCEM", jtPfCEM, &b_jtPfCEM);
    tree->SetBranchAddress("jtPfNEM", jtPfNEM, &b_jtPfNEM);
    tree->SetBranchAddress("jtPfMUM", jtPfMUM, &b_jtPfMUM);
+   /* ---- disabled (kept for reference): jttau1/2/3, absent from the UParTV2 forests ----
    tree->SetBranchAddress("jttau1", jttau1, &b_jttau1);
    tree->SetBranchAddress("jttau2", jttau2, &b_jttau2);
    tree->SetBranchAddress("jttau3", jttau3, &b_jttau3);
+   ---- */
    tree->SetBranchAddress("jtNtrk", jtNtrk, &b_jtNtrk);
    tree->SetBranchAddress("ntrk", &ntrk, &b_ntrk);
    tree->SetBranchAddress("trkJetId", trkJetId, &b_trkJetId);

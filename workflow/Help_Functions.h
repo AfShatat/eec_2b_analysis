@@ -171,8 +171,14 @@ void drawCMSHeader(TPad *pad, const char *sublabel = "Internal",
 
 
 // name for outpur directory (in path)
-TString sDirname = "TemplateFits_Run3_minHLT60_LinearBin";
-TString sDirname_www = "TemplateFits_Run3_minHLT60_LinearBin_www"; //  web version only  
+// ---- disabled (kept for reference): UParT v1 / WP 0.868 output dirs ----
+// TString sDirname = "TemplateFits_Run3_minHLT60_LinearBin";
+// TString sDirname_www = "TemplateFits_Run3_minHLT60_LinearBin_www"; //  web version only
+// ---- disabled (kept for reference): fit output next to the macro ----
+// TString sDirname = "TemplateFits_Run3_minHLT60_LinearBin_upartv2";
+TString sDirname = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/results/TemplateFits_Run3_minHLT60_LinearBin_upartv2";
+// TString sDirname_www = "TemplateFits_Run3_minHLT60_LinearBin_upartv2_www"; //  web version only
+TString sDirname_www = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/results/TemplateFits_Run3_minHLT60_LinearBin_upartv2_www"; //  web version only
 
 
 // -- For systematic uncertainti study 

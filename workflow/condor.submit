@@ -1,10 +1,12 @@
 Universe       = vanilla
-Executable     = condor_hardprobes_data_scripts/jobs_$(Process).sh
+# Job scripts and logs live on /data_CMS (written by make_hardprobes_condor_scripts.sh),
+# so this file can be submitted from anywhere and nothing lands in the code folder.
+Executable     = /data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/condor/hardprobes_data_scripts/jobs_$(Process).sh
 
 input   = /dev/null
-output  = logfiles/jobs_$(Cluster)_$(Process).sh.o
-error   = logfiles/jobs_$(Cluster)_$(Process).sh.e
-Log	= condor.log
+output  = /data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/condor/logfiles/jobs_$(Cluster)_$(Process).sh.o
+error   = /data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/condor/logfiles/jobs_$(Cluster)_$(Process).sh.e
+Log	= /data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/condor/logfiles/condor.log
 getenv         = true                                                                                                                                                                                       
 T3Queue        = long                                                                                                                                                                                      
 WNTag          = el9

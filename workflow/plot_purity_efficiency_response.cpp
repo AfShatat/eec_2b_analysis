@@ -14,8 +14,12 @@
 #include "TMatrixD.h"
 #include "TVectorD.h"
 #include "TDecompSVD.h"
+#include "TSystem.h"
 #include <vector>
 #include <cmath>
+
+// Plots go to /data_CMS so this folder keeps only code.
+const char* PLOT_OUTDIR = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/results";
 
 namespace ROCColor {
   Color_t make(Int_t idx, Int_t r, Int_t g, Int_t b) {
@@ -193,8 +197,11 @@ void plot_purity_efficiency_response()
   gStyle->SetPaintTextFormat("4.3f");
 
 
+  // ---- disabled (kept for reference): UParT v1 / negTag, WP 0.868 ----
+  // TFile *f = TFile::Open("/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/"
+  //                        "RMatrix_Run3_btagWP868_template_for_fit_histos_3D_qcd_f_80_120_2.root","READ");
   TFile *f = TFile::Open("/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/"
-                         "RMatrix_Run3_btagWP868_template_for_fit_histos_3D_qcd_f_80_120_2.root","READ");
+                         "RMatrix_Run3_btagWP872_template_for_fit_histos_3D_qcd_f_80_120_2_upartv2.root","READ");
 
   if(!f || f->IsZombie())
     {std::cout << "Cannot open file" << std::endl;
@@ -378,13 +385,15 @@ void plot_purity_efficiency_response()
     drawCMSHeader((TPad*) gPad);
     gPad->RedrawAxis();
 
-    c->SaveAs("response_matrix.pdf");
-    c->SaveAs("response_matrix.png");
+    gSystem->mkdir(PLOT_OUTDIR, kTRUE);
 
-    cPurity_jtpt_dr->SaveAs("purity_jtpt_dr.pdf");
-    cPurity_jtpt_dr->SaveAs("purity_jtpt_dr.png");
-    cEfficiency_jtpt_dr->SaveAs("efficiency_jtpt_dr.pdf");
-    cEfficiency_jtpt_dr->SaveAs("efficiency_jtpt_dr.png");
-    cCorr1D->SaveAs("efficiency_vs_dr_nominal_pt.pdf");
-    cCorr1D->SaveAs("efficiency_vs_dr_nominal_pt.png");
+    c->SaveAs(Form("%s/response_matrix.pdf", PLOT_OUTDIR));
+    c->SaveAs(Form("%s/response_matrix.png", PLOT_OUTDIR));
+
+    cPurity_jtpt_dr->SaveAs(Form("%s/purity_jtpt_dr.pdf", PLOT_OUTDIR));
+    cPurity_jtpt_dr->SaveAs(Form("%s/purity_jtpt_dr.png", PLOT_OUTDIR));
+    cEfficiency_jtpt_dr->SaveAs(Form("%s/efficiency_jtpt_dr.pdf", PLOT_OUTDIR));
+    cEfficiency_jtpt_dr->SaveAs(Form("%s/efficiency_jtpt_dr.png", PLOT_OUTDIR));
+    cCorr1D->SaveAs(Form("%s/efficiency_vs_dr_nominal_pt.pdf", PLOT_OUTDIR));
+    cCorr1D->SaveAs(Form("%s/efficiency_vs_dr_nominal_pt.png", PLOT_OUTDIR));
 }
