@@ -1,0 +1,14 @@
+Universe       = vanilla
+Executable     = condor_hardprobes_data_scripts/jobs_$(Process).sh
+
+input   = /dev/null
+output  = logfiles/jobs_$(Cluster)_$(Process).sh.o
+error   = logfiles/jobs_$(Cluster)_$(Process).sh.e
+Log	= condor.log
+getenv         = true                                                                                                                                                                                       
+T3Queue        = long                                                                                                                                                                                      
+WNTag          = el9
+
+include : /opt/exp_soft/cms/t3/t3queue |
+
+Queue 50
