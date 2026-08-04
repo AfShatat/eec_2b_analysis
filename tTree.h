@@ -128,6 +128,7 @@ public :
 
    Float_t         discr_deepCSV[500];   //[nref]
    Float_t         discr_pfJP[500];   //[nref]
+   Float_t         discr_pfWrongJP[500];   //[nref]
    Float_t         discr_deepFlavour_b[500];   //[nref]
    Float_t         discr_deepFlavour_bb[500];   //[nref]
    Float_t         discr_deepFlavour_lepb[500];   //[nref]
@@ -164,6 +165,15 @@ public :
    Int_t           jtNcHad[500];   //[nref]
    Int_t           jtNbPar[500];   //[nref]
    Int_t           jtNcPar[500];   //[nref]
+   Int_t           nfullB;
+   Int_t           fullBJetId[100];   //[nfullB]
+   Int_t           fullBPdgId[100];   //[nfullB]
+   Int_t           fullBSta[100];   //[nfullB]
+   Float_t         fullBPt[100];   //[nfullB]
+   Float_t         fullBEta[100];   //[nfullB]
+   Float_t         fullBPhi[100];   //[nfullB]
+   Float_t         fullBM[100];   //[nfullB]
+   Float_t         fullBE[100];   //[nfullB]
 
    // aod compatibility
 //    Float_t jtHadFlav[500]; //[nref]
@@ -315,6 +325,7 @@ public :
 
    TBranch        *b_discr_deepCSV;   //!
    TBranch        *b_discr_pfJP;   //!
+   TBranch        *b_discr_pfWrongJP;   //!
    TBranch        *b_discr_deepFlavour_b;   //!
    TBranch        *b_discr_deepFlavour_bb;   //!
    TBranch        *b_discr_deepFlavour_lepb;   //!
@@ -350,6 +361,15 @@ public :
    TBranch        *b_jtNcHad;   //!
    TBranch        *b_jtNbPar;   //!
    TBranch        *b_jtNcPar;   //!
+   TBranch        *b_nfullB;   //!
+   TBranch        *b_fullBJetId;   //!
+   TBranch        *b_fullBPdgId;   //!
+   TBranch        *b_fullBSta;   //!
+   TBranch        *b_fullBPt;   //!
+   TBranch        *b_fullBEta;   //!
+   TBranch        *b_fullBPhi;   //!
+   TBranch        *b_fullBM;   //!
+   TBranch        *b_fullBE;   //!
 
    TBranch        *b_sjt1Pt;
    TBranch        *b_sjt1Eta;
@@ -623,6 +643,8 @@ void tTree::Init(TString rootf, Int_t dataType, Int_t RunN)
    */
 
    tree->SetBranchAddress("discr_pfJP", discr_pfJP, &b_discr_pfJP); // exist for both Run 2 and 3
+   if (tree->GetBranch("discr_pfWrongJP"))
+     tree->SetBranchAddress("discr_pfWrongJP", discr_pfWrongJP, &b_discr_pfWrongJP);
    tree->SetBranchAddress("jtptCh", jtptCh, &b_jtptCh);
    tree->SetBranchAddress("trkMass", trkMass, &b_trkMass);
 
@@ -672,6 +694,15 @@ void tTree::Init(TString rootf, Int_t dataType, Int_t RunN)
      tree->SetBranchAddress("jtNcHad", jtNcHad, &b_jtNcHad);
      tree->SetBranchAddress("jtNbPar", jtNbPar, &b_jtNbPar);
      tree->SetBranchAddress("jtNcPar", jtNcPar, &b_jtNcPar);
+     tree->SetBranchAddress("nfullB", &nfullB, &b_nfullB);
+     tree->SetBranchAddress("fullBJetId", fullBJetId, &b_fullBJetId);
+     tree->SetBranchAddress("fullBPdgId", fullBPdgId, &b_fullBPdgId);
+     tree->SetBranchAddress("fullBSta", fullBSta, &b_fullBSta);
+     tree->SetBranchAddress("fullBPt", fullBPt, &b_fullBPt);
+     tree->SetBranchAddress("fullBEta", fullBEta, &b_fullBEta);
+     tree->SetBranchAddress("fullBPhi", fullBPhi, &b_fullBPhi);
+     tree->SetBranchAddress("fullBM", fullBM, &b_fullBM);
+     tree->SetBranchAddress("fullBE", fullBE, &b_fullBE);
   
      tree->SetBranchAddress("refptCh", refptCh, &b_refptCh);
      tree->SetBranchAddress("refNtrk", refNtrk, &b_refNtrk);
@@ -728,4 +759,3 @@ Float_t tTree::calc_dr(Float_t eta1, Float_t phi1, Float_t eta2, Float_t phi2) {
     Float_t dr = ROOT::Math::VectorUtil::DeltaR(v1, v2);
     return dr;
 }
-

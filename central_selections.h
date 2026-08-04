@@ -8,6 +8,7 @@ struct KinematicConfig {
   float ptLow;
   float ptHigh;
   float etaMax;
+  bool foldPtOverflow;
 };
 
 // -- Dataset
@@ -138,7 +139,8 @@ bool passGenJetKinematics(const tTree& t,
   if (pt < 0) return false;
 
   if (fabs(eta) > cfg.kin.etaMax) return false;
-  if (pt < cfg.kin.ptLow || pt > cfg.kin.ptHigh) return false;
+  if (pt < cfg.kin.ptLow) return false;
+  if (!cfg.kin.foldPtOverflow && pt > cfg.kin.ptHigh) return false;
 
   return true;
 }
@@ -159,7 +161,8 @@ bool passRecoJetKinematics(const tTree& t,
   float eta = reco_jet_eta(t, ijet);
 
   if (fabs(eta) > cfg.kin.etaMax) return false;
-  if (pt < cfg.kin.ptLow || pt > cfg.kin.ptHigh) return false;
+  if (pt < cfg.kin.ptLow) return false;
+  if (!cfg.kin.foldPtOverflow && pt > cfg.kin.ptHigh) return false;
 
   return true;
 }
@@ -280,7 +283,8 @@ AnalysisConfig buildConfig(
     int n,
     bool btag,
     bool isMC,
-    double btagWP
+    double btagWP,
+    bool foldPtOverflow = true
 ){
   // Backward-compatible argument: MC/data is derived from dataType below.
   (void)isMC;
@@ -292,6 +296,7 @@ AnalysisConfig buildConfig(
   cfg.kin.ptLow = ptLow;
   cfg.kin.ptHigh = ptHigh;
   cfg.kin.etaMax = etaCut;
+  cfg.kin.foldPtOverflow = foldPtOverflow;
 
   // Physics 
   cfg.physics.useBtag = btag;
@@ -318,6 +323,9 @@ std::vector<TString> getActiveBranches(const AnalysisConfig& cfg)
         "vz", // Data and recoMC: in hiEvtAnalyzer/HiTree 
         "jtpt",
         "jteta",
+        "jtphi",
+        "discr_pfJP",
+        "discr_pfWrongJP",
         "nref",
 
         "jtNtrk",
@@ -390,6 +398,16 @@ std::vector<TString> getActiveBranches(const AnalysisConfig& cfg)
             "weight",
             "pthat",
             "jtNbHad",
+            "jtNcHad",
+            "nfullB",
+            "fullBJetId",
+            "fullBPdgId",
+            "fullBSta",
+            "fullBPt",
+            "fullBEta",
+            "fullBPhi",
+            "fullBM",
+            "fullBE",
             // for gen level info
             "refpt",
             "refeta",
@@ -405,7 +423,3 @@ std::vector<TString> getActiveBranches(const AnalysisConfig& cfg)
 
     return branches;
 }
-
-
-
-
