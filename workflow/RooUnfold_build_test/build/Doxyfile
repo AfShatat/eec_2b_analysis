@@ -1,0 +1,5 @@
+@INCLUDE = /home/llr/cms/zaidan/analysis_lise/eec_2b_analysis/RooUnfold_build_test/src/Doxyfile.in
+OUTPUT_DIRECTORY       = /home/llr/cms/zaidan/analysis_lise/eec_2b_analysis/RooUnfold_build_test/build/doxygen/
+INPUT                  = /home/llr/cms/zaidan/analysis_lise/eec_2b_analysis/RooUnfold_build_test/src/src/ /home/llr/cms/zaidan/analysis_lise/eec_2b_analysis/RooUnfold_build_test/src/README.md 
+STRIP_FROM_PATH        = /home/llr/cms/zaidan/analysis_lise/eec_2b_analysis/RooUnfold_build_test/src
+EXAMPLE_PATH           = /home/llr/cms/zaidan/analysis_lise/eec_2b_analysis/RooUnfold_build_test/src/src/examples/
