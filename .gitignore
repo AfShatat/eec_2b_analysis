@@ -26,3 +26,30 @@ condor/*_tmp_*
 condor/*.so
 condor/*.d
 condor/*.pcm
+
+# macOS / sshfs mount metadata
+.DS_Store
+._*
+.fuse_hidden*
+
+# Editor scratch and backups
+*.bak
+*.local
+*.tmp.*
+
+# ACLiC intermediates left behind by a crashed build
+*_ACLiC_dict*_dictContent.h
+*_ACLiC_dict*_dictUmbrella.h
+*_ACLiC_dict.cxx
+*_ACLiC_linkdef.h
+*_ACLiC_map*
+
+# Generated: job scripts and logs, rebuilt by make_hardprobes_condor_scripts.sh
+logfiles/
+condor_hardprobes_data_scripts/
+
+# Separate git checkouts living inside this tree. Committing them with `git add -A`
+# would record a broken gitlink (a submodule entry with no .gitmodules), not their files.
+# jetAnalysis is 445 MB and holds CSVs above GitHub's file size limit.
+/RooUnfold_build_test/
+/jetAnalysis/

@@ -1,12 +1,16 @@
-#include "CMSStyle.C"
+#include "../CMSStyle.C"
 
 // usage:  root -l rootlogon.C plotNice_bdt_roc.C
+
+// Plots go to /data_CMS so this folder keeps only code.
+const char* PLOT_OUTDIR = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/results";
 
 void plotNice_bdt_roc(){
 
   setCMSStyle();
 
-  auto *fin = new TFile("bdt_roc_from_forest.root");
+  // Absolute: the input sits one level up, but the macro is run from workflow/.
+  auto *fin = new TFile("/home/llr/cms/zaidan/analysis_lise/eec_2b_analysis/bdt_roc_from_forest.root");
 
   auto *g1b = (TGraph*) fin->Get("roc1b");
   auto *g2b = (TGraph*) fin->Get("roc2b");
@@ -58,7 +62,8 @@ void plotNice_bdt_roc(){
   btagLbl->SetNDC();
   btagLbl->SetTextFont(42);
   btagLbl->SetTextSize(0.04);
-  btagLbl->DrawLatex(0.2, 0.78, "b-tag WP > 0.868 (UParT)");
+  // Keep in sync with BTAG_WP in run_agg_ntuple_chunks.sh / make_hardprobes_condor_scripts.sh.
+  btagLbl->DrawLatex(0.2, 0.78, "b-tag WP > 0.712 (UParT)");
 
 
   TLatex *latex2 = new TLatex();
@@ -68,4 +73,8 @@ void plotNice_bdt_roc(){
 
   
   drawCMSLabel(c, "Internal Simulation", "2024 pp (5.36 TeV)");
+
+  gSystem->mkdir(PLOT_OUTDIR, kTRUE);
+  c->SaveAs(Form("%s/bdt_roc.png", PLOT_OUTDIR));
+  c->SaveAs(Form("%s/bdt_roc.pdf", PLOT_OUTDIR));
 }

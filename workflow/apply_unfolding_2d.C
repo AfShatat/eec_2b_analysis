@@ -80,21 +80,15 @@ bool normalizeToUnitArea(TH1D *h)
 void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TString pT_selection,
                      int test_mode, bool unfoldBayes, bool scan_niter)
 {
-    //Select unfolding options. test_mode and unfoldBayes are passed in as arguments:
-    //   test_mode 0 = FULL-MC closure : input h3D_bb (full sample), full-sample response/purity/eff,
-    //                         truth = h_full_efficiency_denominator_tf. Same events in and out
-    //                         -> a perfect/technical closure (NOT statistically independent).
-    //   test_mode 1 = SPLIT test      : input h3D_pseudodata_bb (even half), pseudo (odd-half) corrections,
-    //                         truth = h_pseudodata_truth_tf (even half) -> real, independent closure.
-    //   test_mode 2 = DATA            : input h3D_data + template-fit signal fraction, full-sample corrections,
-    //                         truth = hgenjet_2b_passbtag (reference).
-    //   unfoldBayes: true = Bayesian unfolding, false = matrix inversion.
-    //   scan_niter = true  -> run niter = 1..100, save the multi-page PDF + one PNG per iteration,
-    //                         AND the refolding goodness-of-fit scan that picks the optimal niter
-    //                         (refolding_pvalue_vs_iteration_*.{pdf,png,root}). Bayesian only:
-    //                         matrix inversion has no iterations to scan.
-    //   scan_niter = false -> single unfolding with niter = 4, save the usual single bottomline
-    //                         plot. The refolding chi2/p-value of that one iteration is still printed.
+    // Unfolding options. test_mode and unfoldBayes are passed in as arguments:
+    //   0 = FULL-MC closure : h3D_bb, full-sample corrections, truth h_full_efficiency_denominator_tf.
+    //       Same events in and out, so a technical (not statistically independent) closure.
+    //   1 = SPLIT test      : h3D_pseudodata_bb (even half), odd-half corrections,
+    //       truth h_pseudodata_truth_tf (even half) -> real, independent closure.
+    //   2 = DATA            : h3D_data + template-fit signal fraction, full-sample corrections.
+    //   unfoldBayes: true = Bayesian, false = matrix inversion.
+    //   scan_niter:  true = scan niter 1..100 and pick the optimal one from the refolding
+    //       goodness-of-fit test; false = a single unfolding at niter = 4. Bayesian only.
     const bool split_test       = (test_mode == 1);  // -> pseudo (odd-half) corrections + even-half truth
     const bool is_data          = (test_mode == 2);
     const bool multiply_sigfrac = is_data;           // only real data needs the bb template fit
@@ -111,23 +105,18 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
     const Color_t orange = ROCColor::orange();
     const Color_t teal = ROCColor::teal();
 
-    // ---- disabled (kept for reference): UParT v1 / negTag inputs, WP 0.868 ----
-    // TString filename_template_fit = "/home/llr/cms/zaidan/analysis_lise/eec_2b_analysis/TemplateFit_Run3/TemplateFits_Run3_minHLT60_LinearBin/nominal_Run3_TemplateFits_histos_3d_80_inf.root";
-    // TString filename_response = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/RMatrix_Run3_btagWP868_template_for_fit_histos_3D_qcd_f_80_120_2.root";
-    // filename_data (data) = ".../HardProbes/agg_template_chunks/Run3_btagWP868_template_for_fit_histos_3D_data_f_80_120_2MCGEN.root"
-    // filename_data (MC)   = ".../QCD/agg_ntuple_chunks/Run3_btagWP868_template_for_fit_histos_3D_qcd_f_80_120_2MCGEN.root"
-
+    // btagWP<NNN> follows BTAG_WP in the run scripts.
     TString filename_template_fit = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/results/TemplateFits_Run3_minHLT60_LinearBin_upartv2/nominal_Run3_TemplateFits_histos_3d_80_inf.root";
     std::cout << "Using template file: " << filename_template_fit << std::endl;
 
-    TString filename_response = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/RMatrix_Run3_btagWP872_template_for_fit_histos_3D_qcd_f_80_120_2_upartv2.root";
+    TString filename_response = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/RMatrix_Run3_btagWP0712_template_for_fit_histos_3D_qcd_f_upartv2.root";
     std::cout << "Using response file: " << filename_response << std::endl;
 
     // Modes 0/1 unfold MC (h3D_bb / h3D_pseudodata_bb), which live in the MCGEN file.
     // Mode 2 unfolds real data from the data file.
     TString filename_data = is_data
-        ? "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/HardProbes/agg_template_chunks/Run3_btagWP872_template_for_fit_histos_3D_data_f_80_120_2MCGEN_upartv2.root"
-        : "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/Run3_btagWP872_template_for_fit_histos_3D_qcd_f_80_120_2MCGEN_upartv2.root";
+        ? "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/HardProbes/agg_template_chunks/Run3_btagWP0712_template_for_fit_histos_3D_data_fMCGEN_upartv2.root"
+        : "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/Run3_btagWP0712_template_for_fit_histos_3D_qcd_fMCGEN_upartv2.root";
     std::cout << "Getting data from " << filename_data << std::endl; //
     //Select central pT bin
     int ibin_pt = 2;
@@ -419,17 +408,12 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
     // Bottom pad: each correction isolated as the fractional effect (ratio - 1); 0 = no effect.
     // Same main/ratio layout, palette and fonts as the bottomline plot.
     if (test_mode == 2) {
-        // normalise_corr_stages = true  -> every curve to unit area. The gen MC becomes directly
-        //   comparable, and the ratio pad shows the SHAPE effect of each correction -- the
-        //   relevant one for a normalised EEC. Writes ..._norm.{pdf,png}.
-        // normalise_corr_stages = false -> absolute EEC. The ratio pad shows the true SIZE of
-        //   each correction; the gen MC has no luminosity scaling, so it is scaled to the data
-        //   integral and is a shape reference only. Writes the unsuffixed files.
-        // Currently OFF: this plot is here to show how big each correction is, and normalising
-        // every stage to unit area divides exactly that out -- a correction that only rescales
-        // the distribution becomes invisible, and one that changes the shape gets its size
-        // hidden. To go back to the normalised version, set this to true AND uncomment the
-        // normalizeToUnitArea loop below (both, or the plot is labelled normalised but is not).
+        // normalise_corr_stages = true  -> every curve to unit area; the ratio pad shows the
+        //   SHAPE effect of each correction. Writes ..._norm.{pdf,png}.
+        // false -> absolute EEC; the ratio pad shows the true SIZE of each correction, and the
+        //   gen MC is scaled to the data integral as a shape reference. Writes unsuffixed files.
+        // Currently OFF, because normalising divides out exactly what this plot is meant to show.
+        // To restore it set this true AND uncomment the normalizeToUnitArea loop below.
         const bool normalise_corr_stages = false;
         std::cout << "\t---->Making correction-stage EEC + ratio plot ("
                   << (normalise_corr_stages ? "normalised" : "absolute") << ")" << std::endl;
@@ -437,13 +421,10 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
         TH2D *h_svb_c  = ratioFromCounts("hgenjet_2b_reco_btag", "hgenjet_2b_all",      "b"); // 2SV + b-tag combined
         TH2D *h_eec_c  = ratioFromCounts("hgenjet_2b_reco_btag", "hgenjet_2b_passbtag", "");  // EEC weight
 
-        // 2SV alone. No count pair gives it directly: hgenjet_2b / hgenjet_2b_all would be the
-        // 2SV efficiency TIMES the reco/gen EEC-weight ratio, because those two are filled with
-        // different weights (w_reco vs w_gen). Factorise the combined efficiency instead,
-        //   eff(2SV + b-tag) = eff(2SV) x eff(b-tag)   ->   eff(2SV) = h_svb_c / h_btag_c,
-        // which is the same incremental step the plot already showed in its ratio pad. The errors
-        // treat the two ratios as independent when they are not (both contain
-        // hgenjet_2b_reco_btag) -- the same approximation as before, fine for a diagnostic plot.
+        // 2SV alone. No count pair gives it directly (hgenjet_2b / hgenjet_2b_all mixes in the
+        // reco/gen EEC-weight ratio, different weights), so factorise the combined efficiency:
+        //   eff(2SV) = eff(2SV + b-tag) / eff(b-tag) = h_svb_c / h_btag_c.
+        // The errors treat the two ratios as independent when they are not; fine for a diagnostic.
         TH2D *h_2sv_c = nullptr;
         if (h_svb_c && h_btag_c) {
             h_2sv_c = (TH2D*) h_svb_c->Clone("ratio_2sv_only");
@@ -1072,12 +1053,9 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
     gErrorIgnoreLevel = prev_ignore;
 
     // ---- Regularisation: pick the number of iterations from the refolding test ------------
-    // p-value of the refolded-vs-input comparison as a function of the iteration number.
-    // Expected behaviour: monotonic convergence -- p rises with niter as the nonclosure
-    // shrinks, then saturates as the refolded distribution overfits the input. The optimal
-    // iteration is the first one that is statistically compatible with the input, i.e. the
-    // smallest niter with p >= pvalue_threshold: going further buys no goodness of fit and
-    // only feeds fluctuations back through the prior.
+    // p-value of refolded vs input against the iteration number. It rises as the nonclosure
+    // shrinks, then saturates. The optimal iteration is the smallest niter with
+    // p >= pvalue_threshold; going further only feeds fluctuations back through the prior.
     if (unfoldBayes && v_niter.size() > 1) {
 
         auto firstAbove = [&](const std::vector<double> &p) -> int {
@@ -1088,11 +1066,9 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
         const int best_all = firstAbove(v_pvalue_all);
         const int best_pt  = firstAbove(v_pvalue_pt);
 
-        // Secondary diagnostic. With a well-conditioned response the p-value can already clear
-        // the threshold at the first iteration, which makes the criterion above degenerate;
-        // chi2/ndf still says where the refolding stops closing and starts over-describing the
-        // input (chi2/ndf falling well below 1 = the refolded distribution is tracking the
-        // input's own fluctuations).
+        // Secondary diagnostic: with a well-conditioned response the p-value can clear the
+        // threshold at the first iteration, and chi2/ndf still shows where the refolding starts
+        // over-describing the input (chi2/ndf well below 1).
         auto closestToOne = [&](const std::vector<double> &c) -> int {
             int best = -1; double dmin = 1e30;
             for (size_t i = 0; i < c.size(); ++i) {
@@ -1178,11 +1154,8 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
             l_best->SetLineColor(red); l_best->SetLineStyle(7); l_best->SetLineWidth(2);
             l_best->Draw("same");
         }
-        // With a single curve a legend is noise; label the threshold line where it sits instead.
-        // User coordinates (not NDC) so the label tracks the line, at the right-hand end where
-        // the curve has already saturated near 1 and cannot collide with the text. Which side of
-        // the line has room depends on the scale: on log y there are decades below 0.05 to sit in,
-        // on linear y that space is a sliver against the frame edge, so go above the line instead.
+        // Label the threshold line where it sits rather than adding a legend. User coordinates
+        // so the label tracks the line; it goes above the line on linear y, below on log y.
         TLatex tx_thr;
         tx_thr.SetTextFont(font_code); tx_thr.SetTextSize(label_size); tx_thr.SetTextColor(kGray + 2);
         tx_thr.DrawLatex(x_hi_it - 0.25 * (x_hi_it - x_lo_it),

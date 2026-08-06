@@ -1,13 +1,16 @@
-#include "CMSStyle.C"
+#include "../CMSStyle.C"
 
 // usage:  root -l rootlogon.C plotNice_UParT_roc.C
 
+// Plots go to /data_CMS so this folder keeps only code.
+const char* PLOT_OUTDIR = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/results";
 
 void plotNice_UParT_roc(){
 
   setCMSStyle();
 
-  auto *fin = new TFile("btag_roc_qcd.root");
+  // Absolute: the input sits one level up, but the macro is run from workflow/.
+  auto *fin = new TFile("/home/llr/cms/zaidan/analysis_lise/eec_2b_analysis/btag_roc_qcd.root");
 
   auto *g1b = (TGraph*) fin->Get("roc_1b_r3");
   auto *g2b = (TGraph*) fin->Get("roc_2b_r3");
@@ -99,4 +102,8 @@ void plotNice_UParT_roc(){
   
   
   drawCMSLabel(c, "Internal Simulation", "2024 pp (5.36 TeV)");
+
+  gSystem->mkdir(PLOT_OUTDIR, kTRUE);
+  c->SaveAs(Form("%s/UParT_roc.png", PLOT_OUTDIR));
+  c->SaveAs(Form("%s/UParT_roc.pdf", PLOT_OUTDIR));
 }

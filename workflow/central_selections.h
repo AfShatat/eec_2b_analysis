@@ -1,30 +1,28 @@
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ---------------------------------START: PART CAN GO TO COMMON HEADER --------------------------------------------
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ---- Could move to a common header ----
 
 // -- Jet kinematics 
 struct KinematicConfig {
   float ptLow;
-  float ptHigh;
   float etaMax;
 
-  // -- Open-ended last pT bin.
-  // true (default): the selection runs ptLow ... infinity. Jets above ptHigh are kept
-  // and the filling code clamps them to jtpt_max_fill, so they land in the last pT bin
-  // and nothing ends up in the overflow bin - see jtpt_fill() in binning_histos_small.h.
-  // ptHigh then only sets the last bin edge (and the output file name), not a cut.
-  // Set false to restore the old behaviour of rejecting jets above ptHigh.
+  // Open-ended last pT bin: the selection runs ptLow ... infinity and jtpt_fill() in
+  // binning_histos_small.h clamps high jets into the last bin. The pT range comes from
+  // jtpt_binsVector there, not from here.
+
+  /* ---- disabled (kept for reference): ptHigh, and the hard cut on it ----
+  float ptHigh;
   bool foldPtOverflow = true;
+  ---- */
 };
 
 // -- Dataset
 struct DatasetConfig {
   int RunN;        // 2 or 3
-  int dataType;    // data / MC type (0: Data, 1: bjet MC, 2: qcd MC), and for Run2: -1 is for lowEG, and 0 for HighEG
+  int dataType;    // 0: Data, 1: bjet MC, 2: qcd MC; Run2 also uses -1 lowEG, 0 highEG
   bool isMC;      // true for MC, false for data
   TString filename; // input sample full path to root file 
-  TString output_folder =  gSystem->ExpandPathName("$mydata/analysis_lise/"); // base path; Run2/ or Run3/ subfolder appended in buildDataset()
+  TString output_folder =  gSystem->ExpandPathName("$mydata/analysis_lise/"); // Run2/ or Run3/ appended in buildDataset()
   TString output_hist; // for output file name (for templates)
   TString domain = ".root";
 
@@ -35,13 +33,13 @@ struct DatasetConfig {
   int fileindex = 0; // to be checked
 };
 
-// -- Physics selections: trigger and btagging 
+// -- Trigger and b-tagging
 struct PhysicsConfig {
   bool useBtag;
-  double btagWP; // use -1 if you want default Run2 and Run3 values, otherwise set a custom WP value!  
+  double btagWP; // -1 for the Run2/Run3 defaults, otherwise a custom WP
 };
 
-// -- Full Analysis configuration structure 
+// -- Full configuration
 struct AnalysisConfig {
 
   DatasetConfig dataset;
@@ -52,7 +50,7 @@ struct AnalysisConfig {
 
 };
 
-// -- Helper function for reco MC (or data)/gen MC choice of branches
+// -- Reco/gen branch accessors
 float reco_jet_pt(const tTree& t, int ijet) {
   return t.jtpt[ijet];
 }
@@ -68,8 +66,8 @@ float gen_jet_eta(const tTree& t, int ijet) {
   return t.refeta[ijet];
 }
 
-// ----------- Selection function for each configuration choice 
-// -- event selection based on trigger 
+// ---- Selection functions ----
+// -- Trigger selection
 bool passEventSelection(const tTree& t,
                         const AnalysisConfig& cfg) { 
 
@@ -105,7 +103,7 @@ bool passEventSelection(const tTree& t,
   return true;
 }
 
-// -- Add selection of vz (hiEvtAnalyzer/HiTree --> vz/F) and pprimaryVertexFilter (skimanalysis/HltTree --> pprimaryVertexFilter/I) cuts 
+// -- Event selection: vz and pprimaryVertexFilter
 bool passPVQuality_EventSelection(const tTree& t,
                                   const AnalysisConfig& cfg){
 
@@ -125,13 +123,12 @@ bool passPVQuality_EventSelection(const tTree& t,
 }
 
 
-// -- Jet kinematic selection: seperated for Gen/Reco + cleaned events of large weights based on jetpt
+// -- Jet kinematics, separately for gen/reco, plus pthat cleaning of large-weight events
 bool passGenJetKinematics(const tTree& t,
                           int ijet,
                           const AnalysisConfig& cfg) {
   
-  // This function have check for refpt > 0
-  // It return false if the event pthat cut is not satisfied (which is based on reco jtpt, yes, reco pt not gen pt!).
+  // Checks refpt > 0, and applies the pthat cut on the RECO jtpt (not gen).
   
   // ---------------- MC EVENT CLEANING ----------------
   if (cfg.dataset.isMC) {
@@ -147,7 +144,9 @@ bool passGenJetKinematics(const tTree& t,
 
   if (fabs(eta) > cfg.kin.etaMax) return false;
   if (pt < cfg.kin.ptLow) return false;
+  /* ---- disabled (kept for reference): upper pT cut ----
   if (!cfg.kin.foldPtOverflow && pt > cfg.kin.ptHigh) return false;
+  ---- */
 
   return true;
 }
@@ -169,7 +168,9 @@ bool passRecoJetKinematics(const tTree& t,
 
   if (fabs(eta) > cfg.kin.etaMax) return false;
   if (pt < cfg.kin.ptLow) return false;
+  /* ---- disabled (kept for reference): upper pT cut ----
   if (!cfg.kin.foldPtOverflow && pt > cfg.kin.ptHigh) return false;
+  ---- */
 
   return true;
 }
@@ -204,17 +205,14 @@ bool passBtag(const tTree& t,
 // -- Function: set the Dataset and output templates names 
 DatasetConfig buildDataset(int RunN, int dataType, bool isMC, const PhysicsConfig& physics) {
 
-  // Set the rest of DatasetConfig information (Input file name + output hist for templates)
-
   DatasetConfig d;
   d.RunN = RunN;
   d.dataType = dataType;
   d.isMC = isMC;
 
-  // Save output in the Run2/ or Run3/ subfolder accordingly
   d.output_folder += (RunN == 2) ? "Run2/" : "Run3/";
 
-  // -- Set pre-calculated prescales 
+  // Pre-calculated prescales
   if (RunN == 2){
       d.data_prescale = 33.917210; // prescale 40-60 GeV
     }
@@ -222,7 +220,8 @@ DatasetConfig buildDataset(int RunN, int dataType, bool isMC, const PhysicsConfi
       d.data_prescale = 6.34958; // prescale 60-80 GeV --> value updated on 19 June (to include the trigger 120 GeV + full data stats)
     }
 
-  TString add_BtagWP = physics.useBtag ? Form("_btagWP%d", static_cast<int>(std::round(1000 * physics.btagWP))):"_nobtag"; // round to int without floating digits
+  // WP as 4 zero-padded digits after the decimal point: 0.712 -> btagWP0712, 0.868 -> btagWP0868.
+  TString add_BtagWP = physics.useBtag ? Form("_btagWP%04d", static_cast<int>(std::round(1000 * physics.btagWP))):"_nobtag";
   TString sample = "";
 
   if (RunN == 2) {
@@ -274,36 +273,30 @@ DatasetConfig buildDataset(int RunN, int dataType, bool isMC, const PhysicsConfi
 
   return d;
 }
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ---------------------------------END: PART CAN GO TO COMMON HEADER --------------------------------------------
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// --- HERE: USER: Factory function of analysis configurations: set all configurations to use ---
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ---- Factory function: set all analysis configurations here ----
 AnalysisConfig buildConfig(
     int RunN,
     int dataType,
     float ptLow,
-    float ptHigh,
+    /* ---- disabled (kept for reference): float ptHigh, ---- */
     float etaCut,
     int n,
     bool btag,
     bool isMC,
-    double btagWP,
-    bool foldPtOverflow = true
+    double btagWP
+    /* ---- disabled (kept for reference): , bool foldPtOverflow = true ---- */
 ){
-  // Backward-compatible argument: MC/data is derived from dataType below.
+  // Kept for compatibility: MC/data is derived from dataType.
   (void)isMC;
-
-  // -- USER: SET HERE YOUR DESIRED ANALYSIS CONFIG -------
 
   AnalysisConfig cfg;
   // Kinematics
   cfg.kin.ptLow = ptLow;
-  cfg.kin.ptHigh = ptHigh;
   cfg.kin.etaMax = etaCut;
+  /* ---- disabled (kept for reference): see KinematicConfig ----
+  cfg.kin.ptHigh = ptHigh;
   cfg.kin.foldPtOverflow = foldPtOverflow;
+  ---- */
 
   // Physics 
   cfg.physics.useBtag = btag;
@@ -321,13 +314,17 @@ AnalysisConfig buildConfig(
   return cfg;
 }
 
-/////////////////////////////////////
-// ----------- Centralize activated branches based on need from configuration ----------------
+// ---- Activate only the branches the configuration needs ----
 std::vector<TString> getActiveBranches(const AnalysisConfig& cfg)
 {
     std::vector<TString> branches = { // Both Run2 and Run 3 (Data/ recoMC)
 
-        "vz", // Data and recoMC: in hiEvtAnalyzer/HiTree 
+        "vz", // Data and recoMC: in hiEvtAnalyzer/HiTree
+        // Event id, also from hiEvtAnalyzer/HiTree. Needed by the AggBHadron ntuple;
+        // without them here SetBranchStatus("*",0) leaves all three reading back as 0.
+        "run",
+        "lumi",
+        "evt",
         "jtpt",
         "jteta",
         "nref",

@@ -1,11 +1,10 @@
 Universe       = vanilla
-# Job scripts and logs are written to /data_CMS by make_hardprobes_condor_scripts.sh.
-Executable     = /data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/condor/hardprobes_data_scripts/jobs_$(Process).sh
+Executable     = condor_hardprobes_data_scripts/jobs_$(Process).sh
 
 input   = /dev/null
-output  = /data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/condor/logfiles/jobs_$(Cluster)_$(Process).sh.o
-error   = /data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/condor/logfiles/jobs_$(Cluster)_$(Process).sh.e
-Log	= /data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/condor/logfiles/condor.log
+output  = logfiles/jobs_$(Cluster)_$(Process).sh.o
+error   = logfiles/jobs_$(Cluster)_$(Process).sh.e
+Log	= condor.log
 getenv         = true                                                                                                                                                                                       
 T3Queue        = long                                                                                                                                                                                      
 WNTag          = el9

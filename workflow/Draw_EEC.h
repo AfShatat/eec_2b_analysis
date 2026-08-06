@@ -6,11 +6,9 @@ void draw_eec_simple(TString fout_name, TFile* foutputPlots, TString &folder, bo
     // folder: is the current working directory
     // The jet pt bin to draw: 0 to 3: integrated, 80 to 140 GeV. Nominal bin: 100-120 GeV, ibin_pt = 2.
 
-    // -- output directory.
-    // The EEC png/pdf output is switched off: only the template-fit plots are wanted, and
-    // they all live in the one flat folder sDirname_www. The canvases and heec_* histograms
-    // are still written into foutputPlots, so nothing is lost from the summary root file.
-    // Flip save_eec_plots to (ivar == NOMINAL) to bring the pngs back.
+        // -- output directory. EEC png/pdf output is off: only the template-fit plots are
+        // wanted. Canvases and heec_* histograms still go into foutputPlots.
+        // Flip save_eec_plots to (ivar == NOMINAL) to bring the pngs back.
     const bool save_eec_plots = false;
     TString sresultDir_eec     = sDirname_www;
     TString sresultDir_eec_www = sDirname_www;
@@ -36,9 +34,8 @@ void draw_eec_simple(TString fout_name, TFile* foutputPlots, TString &folder, bo
         TFile *file = new TFile(sDirname + "/"+ fout_name, "read");
             // read data (no rebinning)
             TH3D* h3D_data = (TH3D*) file->Get("h3D_data");
-            // Take the mass range from the histogram being projected, not from the global
-            // mb_bins: the fit-range variations rebin the mass axis and leave that global
-            // at the rebinned value, which would silently drop the top mass bins here.
+                // Take the mass range from the histogram being projected, not the global mb_bins:
+                // the fit-range variations rebin the mass axis and leave that global stale.
             Int_t N_mb_bins = h3D_data->GetNbinsX();
             TH1D *h1D_scaled = h3D_data->ProjectionY(Form("h_data_dr_%d", ibin_pt), 1, N_mb_bins, SliceFirstbin_pt, SliceLastbin_pt);
                 // Raw (undecomposed) data EEC -> black, the measured quantity.
@@ -71,9 +68,8 @@ void draw_eec_simple(TString fout_name, TFile* foutputPlots, TString &folder, bo
 
                 }
 
-            // -- Scale Raw data EEC(dr) by the signal fraction, bin by bin in dr
-            // Both are DATA (raw data EEC x the fitted fraction), so both stay solid; the
-            // colour says which component: 2B -> red, 1B+0B -> the neutral summed-bkg colour.
+                // -- Scale raw data EEC(dr) by the signal fraction, bin by bin in dr. Both are
+                // DATA so both stay solid; colour says the component: 2B -> red, 1B+0B -> neutral.
             TH1D* heec_sigfrac = (TH1D*) h1D_scaled->Clone("heec_sigfrac"); heec_sigfrac->Multiply(hsigfrac_dr);
                 styleCurve(heec_sigfrac, TFColor::c2B(), /*is_data=*/true);
                 heec_sigfrac->SetLineWidth(3);
@@ -108,12 +104,8 @@ void draw_eec_simple(TString fout_name, TFile* foutputPlots, TString &folder, bo
 
             // Sum 1B + 0B as total bkg
             TH1D* h1D_b_0b = (TH1D*) h1D_b->Clone("h1D_b_0b"); h1D_b_0b->Add(h1D_0b);
-                // set their styles
-                // This canvas is MC only, so nothing here needs the dashed "MC" marking --
-                // it would just be dashed everywhere. Category colour carries the meaning,
-                // and within 2B the line style separates which sample it came from.
-                // (The two clones taken further down ARE overlaid on data, and get restyled
-                //  as MC there.)
+                    // set their styles. MC-only canvas, so no dashed "MC" marking is needed;
+                    // colour carries the category, line style separates the source sample.
                 styleCurve(h1D_bb_combined, TFColor::c2B(), /*is_data=*/true);   // 2B total
                 h1D_bb_combined->SetLineWidth(3);
                 styleCurve(h1D_bb, TFColor::c2B(), /*is_data=*/true);            // 2B, qcd only
@@ -175,9 +167,8 @@ void draw_eec_simple(TString fout_name, TFile* foutputPlots, TString &folder, bo
                 if (also_bjet) h1D_bb_bjets->Draw("hist E same");
                 h1D_bb_combined->Draw("hist E same");
                 
-                // Build the entries conditionally: with also_bjet off, h1D_bb_bjets is a
-                // nullptr and listing it unconditionally put a phantom "2B (bjets)" row in
-                // the legend -- a black marker for a curve that was never drawn.
+                    // Built conditionally: with also_bjet off, h1D_bb_bjets is null and an
+                    // unconditional entry put a phantom "2B (bjets)" row in the legend.
                 std::vector<TObject*>    mc_objs   = {h1D_bb_combined, h1D_bb};
                 std::vector<std::string> mc_opts   = {"LPE", "LPE"};
                 std::vector<std::string> mc_labels = {h1D_bb_combined->GetName(), "2B (qcd)"};
@@ -214,10 +205,8 @@ void draw_eec_simple(TString fout_name, TFile* foutputPlots, TString &folder, bo
                     cout << "2B in MC =  " << int2 << endl;
                     cout << "1B + 0B in MC =  " << int1+int0 << endl;
 
-                // using qcd + bjet: combined hist is already of qcd integral
-                // These two ARE drawn on top of the data curves below, so here the dashed +
-                // open-marker "MC" style earns its keep: same colour as the data component
-                // they are compared against, different style, so each pair reads as a pair.
+                // Drawn on top of the data curves below, so the dashed + open-marker "MC"
+                // style earns its keep: same colour as the data component, different style.
                 TH1D* heec_bb_MC_scaled =  (TH1D*) h1D_bb_combined->Clone("heec_bb_MC_scaled");
                         heec_bb_MC_scaled->Scale(1. * int_2B_data/int2);
                         styleCurve(heec_bb_MC_scaled, TFColor::c2B(), /*is_data=*/false);

@@ -86,18 +86,15 @@ Double_t jtpt_binsVector[jtpt_binsVectorSize] = {
 Double_t jtpt_min = jtpt_binsVector[0];
 Double_t jtpt_max = jtpt_binsVector[jtpt_bins];
 
-// The last pT bin is open-ended: it means "the last edge and above", drawn with the
-// representative width of that bin. Jets above jtpt_max are filled at jtpt_max_fill so
-// they land in that bin rather than in ROOT's overflow bin, which the pT slices in
-// template_fit.cpp skip (they project bins 1..bins_pt only).
-// Derived from the last edge, so adding an entry to jtpt_binsVector carries it along.
+// The last pT bin is open-ended: "the last edge and above". Jets above jtpt_max are filled
+// at jtpt_max_fill so they land in that bin rather than ROOT's overflow bin, which the pT
+// slices in template_fit.cpp skip. Derived from the last edge.
 Double_t jtpt_max_fill = jtpt_max - 0.1;
 inline Double_t jtpt_fill(Double_t pt){ return (pt >= jtpt_max) ? jtpt_max_fill : pt; }
 
 
-// bins_pt / pt_min / pt_max are aliases of the jet-pT binning above and must never
-// disagree with it: code that loops to bins_pt then indexes jtpt_binsVector[ibin_pt],
-// so a mismatch reads past the end of the array. Deriving them here means adding an
+// bins_pt / pt_min / pt_max alias the jet-pT binning above and must never disagree with it:
+// code loops to bins_pt then indexes jtpt_binsVector[ibin_pt]. Derived here, so adding an
 // edge to jtpt_binsVector is the only edit needed to add a pT bin.
 Int_t bins_pt = jtpt_bins;
 Double_t pt_min = jtpt_min;

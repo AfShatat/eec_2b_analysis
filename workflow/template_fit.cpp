@@ -10,19 +10,17 @@
 void do_template_fit_combined(const TString &HighEGdata_name, const TString &LowEGdata_name, TString &templates, TString &templates_bjet, TString pT_selection, TString folder, TString &fout_name, bool& alsoLowEG, bool& also_bjet,  Variation ivar = NOMINAL){
     /*
         // ----- WORK in PROGRESS ---- 14/04/2026
-        // In the new version of files: 2B contribution has both 2B + morethan2B in the same histogram. No anymore seprated histogram for it.
-        // 0B onl from qcd sample. bjet sample 0B contribution is not physical (it is already filtered to be bjets so these light quark templates are not real but mistaken).
+        // 2B now covers 2B + more-than-2B in one histogram. 0B comes from the qcd sample
+        // only: the bjet sample is filtered to b jets, so its 0B templates are not physical.
         // Argument add for possible varations on the fit
     */
 
     // Test CMS style 
     // setCMSStyle();
 
-    // -- All wanted plots go into one flat directory: sDirname_www. No per-variation
-    // subfolders, and the root files stay in the main directory (sDirname).
-    // Only the nominal variation is plotted -- the others are still fitted, because
-    // draw_variation_uncertainity() needs their fractions for the 0B systematic, but
-    // their per-bin canvases are not wanted.
+    // All plots go into one flat directory (sDirname_www); root files stay in sDirname.
+    // Only the nominal variation is plotted; the others are still fitted because
+    // draw_variation_uncertainity() needs their fractions for the 0B systematic.
     const bool save_png = (ivar == NOMINAL);
     TString sDir_canvas = sDirname_www;
         if (save_png) gSystem->mkdir(sDir_canvas, kTRUE);
@@ -120,12 +118,9 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
         styleTemplate(h3D_bb,  TFColor::c2B());
         styleTemplate(h3D_nob, TFColor::c0B());
 
-    // -- Define used bins.
-    // The binning is owned by binning_histos_small.h: the inputs were booked from it and
-    // the loops below index jtpt_binsVector / dr_binsVector with the bin counters, so the
-    // two have to agree. Verify that here rather than silently adopting whatever the file
-    // happens to contain -- adding a pT bin to jtpt_binsVector and regenerating the inputs
-    // is then picked up automatically, and forgetting to regenerate stops the job.
+    // -- Define used bins. The binning is owned by binning_histos_small.h and the loops
+    // below index jtpt_binsVector / dr_binsVector, so verify the inputs match it rather
+    // than adopting whatever they contain.
     if (!CheckInputBinning(h3D_data)) return;
     if (!CheckInputBinning(h3D_b))    return;
     if (!CheckInputBinning(h3D_bb))   return;
@@ -465,12 +460,8 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
                     // cout << "After Normalization (qcd +bjet) True 2B integral = " << h_sig->Integral(1, h_sig_bins, "width") << endl;
                     // cout << "After Normalization (qcd+bjet)  True 1B integral =  "<<  h_bkg->Integral(1, h_bkg_bins, "width") << endl;
 
-            // -- Effective bkg PDF 
-                // Assume : a + b + c = 1; where a, b, c, are fractions in in nominal MC like 
-                // a: 2B fraction, b: 1B fraction, c: 0B fraction, in 
-                // and For Effective bkg: b`+ c` should = 1, so relate b`to b .. and simialr for c`
-                // This result in: b`= b/(b+c), and c`= c/(b+c); one can use b+c = 1-a;  
-                // I will write it in terms of the 2B sig, 1B bkg true fractions, before use effecive ones 
+                // -- Effective bkg PDF. With a + b + c = 1 (a: 2B, b: 1B, c: 0B) and
+                // b' + c' = 1, this gives b' = b/(b+c) and c' = c/(b+c), with b+c = 1-a.
                     double eff_bkg0B = (1 - sig_fraction_true - bkg_fraction_b_true)/(1- sig_fraction_true);// c`
                     double eff_bkg1B = 1. - eff_bkg0B;// b`
             // Build effective bkg hist: with new relaitve normalization, the integral should = 1
@@ -508,9 +499,8 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
             h_sig->SetTitle("2B");
             styleTemplate(h_bkg, TFColor::bkg());   // 1B + 0B summed -> neutral
             styleTemplate(h_sig, TFColor::c2B());
-            // Solid, NOT the old 3244 hatch: h_sig is cloned into h_2B_scaledtoData (prefit
-            // stack) and h_sig_fit (postfit stack) and carries its fill style with it, so a
-            // hatch here made the prefit 2B slice a different texture from the postfit one.
+                // Solid, not hatched: h_sig is cloned into the prefit and postfit stacks and
+                // carries its fill style with it, so a hatch here desynced the two.
 
 
 /* ---- disabled (kept for reference): normalized-PDF prefit canvas ----
@@ -932,12 +922,9 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
                     pad1->Draw();
                     pad2->Draw();
                     pad1->cd();
-                    // Draw frame to control y axis name: frame needed to control y axis name
-                    // Range comes from h_data_mb, not from hstack_afterfit: THStack::GetXaxis()
-                    // returns null until the stack has been painted, and the only Draw() of this
-                    // stack is the one below. h_data_mb shares the mass axis with every template,
-                    // and the stack sums to h_total_fit (p1 + p2 = 1 - p0), so this is equivalent
-                    // without depending on paint order.
+                    // Frame controls the y axis name. Range comes from h_data_mb, not from
+                    // hstack_afterfit: THStack::GetXaxis() is null until the stack is painted,
+                    // and the stack sums to h_total_fit, so this is equivalent.
                     Double_t ymax_postfit = 1.3 * std::max(h_data_mb->GetMaximum(), h_total_fit->GetMaximum());
                     TH1F *frame = pad1->DrawFrame(h_data_mb->GetXaxis()->GetXmin(), 0, h_data_mb->GetXaxis()->GetXmax(), ymax_postfit);
                         frame->GetYaxis()->SetTitle("Counts/[GeV]");
@@ -982,10 +969,8 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
 
 
 
-    // TH2D: signal / background fractions.
-    // The bin errors are stored inside these histograms, so the separate
-    // *_error clones are not written anymore (h_sig_frac_true_error and
-    // h_*_error_fitbins were never even filled).
+    // TH2D: signal / background fractions. Bin errors live inside these histograms, so the
+    // separate *_error clones are no longer written.
     fout->cd();
     for (auto h : {h_sig_fraction,
                    h_bkg_fraction,
@@ -1086,10 +1071,8 @@ void Draw_template_Run3(TString &templates, TString pT_selection, TString folder
         styleTemplate(h3D_bb,  TFColor::c2B());
         styleTemplate(h3D_nob, TFColor::c0B());
 
-    // -- Define used bins. Same contract as do_template_fit_combined(): the binning is
-    // owned by binning_histos_small.h, so validate the inputs against it instead of
-    // adopting their axes (these are globals -- adopting them would leave bins_pt out of
-    // step with jtpt_binsVector for everything that runs afterwards).
+    // -- Define used bins. As in do_template_fit_combined(): validate the inputs against
+    // binning_histos_small.h instead of adopting their axes (these are globals).
     if (!CheckInputBinning(h3D_bb))  return;
     if (!CheckInputBinning(h3D_b))   return;
     if (!CheckInputBinning(h3D_nob)) return;
@@ -1378,12 +1361,8 @@ void Draw_template_Run3(TString &templates, TString pT_selection, TString folder
                     // cout << "After Normalization (qcd +bjet) True 2B integral = " << h_sig->Integral(1, h_sig_bins, "width") << endl;
                     // cout << "After Normalization (qcd+bjet)  True 1B integral =  "<<  h_bkg->Integral(1, h_bkg_bins, "width") << endl;
 
-            // -- Effective bkg PDF 
-                // Assume : a + b + c = 1; where a, b, c, are fractions in in nominal MC like 
-                // a: 2B fraction, b: 1B fraction, c: 0B fraction, in 
-                // and For Effective bkg: b`+ c` should = 1, so relate b`to b .. and simialr for c`
-                // This result in: b`= b/(b+c), and c`= c/(b+c); one can use b+c = 1-a;  
-                // I will write it in terms of the 2B sig, 1B bkg true fractions, before use effecive ones 
+                // -- Effective bkg PDF. With a + b + c = 1 (a: 2B, b: 1B, c: 0B) and
+                // b' + c' = 1, this gives b' = b/(b+c) and c' = c/(b+c), with b+c = 1-a.
                     double eff_bkg0B = (1 - sig_fraction_true - bkg_fraction_b_true)/(1- sig_fraction_true);// c`
                     double eff_bkg1B = 1. - eff_bkg0B;// b`
             // Build effective bkg hist: with new relaitve normalization, the integral should = 1
@@ -1890,11 +1869,9 @@ void template_fit(){
     if (RunN == 3){
         alsoLowEG = false; 
         also_bjet = false;
-        // ---- disabled (kept for reference): UParT v1 / negTag inputs, WP 0.868 ----
-        // dataset_HG = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/HardProbes/agg_template_chunks/Run3_btagWP868_template_for_fit_histos_3D_data_f_80_120_2MCGEN.root";
-        // templates_dijet = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/Run3_btagWP868_template_for_fit_histos_3D_qcd_f_80_120_2MCGEN.root";
-        dataset_HG = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/HardProbes/agg_template_chunks/Run3_btagWP872_template_for_fit_histos_3D_data_f_80_120_2MCGEN_upartv2.root";
-        templates_dijet = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/Run3_btagWP872_template_for_fit_histos_3D_qcd_f_80_120_2MCGEN_upartv2.root";
+        // btagWP<NNN> follows BTAG_WP in the run scripts.
+        dataset_HG = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/HardProbes/agg_template_chunks/Run3_btagWP0712_template_for_fit_histos_3D_data_fMCGEN_upartv2.root";
+        templates_dijet = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/Run3_btagWP0712_template_for_fit_histos_3D_qcd_fMCGEN_upartv2.root";
         fout_name = Form("Run%d_TemplateFits_histos_3d_%s.root", RunN, pT_selection.Data());
     }
     else if (RunN == 2){

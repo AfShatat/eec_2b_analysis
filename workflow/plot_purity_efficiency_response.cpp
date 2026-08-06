@@ -15,6 +15,7 @@
 #include "TVectorD.h"
 #include "TDecompSVD.h"
 #include "TSystem.h"
+#include "binning_histos_small.h"
 #include <vector>
 #include <cmath>
 
@@ -118,13 +119,10 @@ void drawCMSHeader(TPad *pad, const char *sublabel = "Internal Simulation",
 }
 
 
-// Condition number kappa = sigma_max / sigma_min of the response matrix.
-//
-// Bins that are completely empty (a particle-level row or a detector-level column
-// with no entries anywhere) contribute an exact zero singular value, which would
-// make kappa infinite and say nothing about the conditioning of the part of the
-// problem that is actually constrained. They are dropped here and the SVD is run
-// on the surviving sub-matrix only.
+// Condition number kappa = sigma_max / sigma_min of the response matrix. Completely empty
+// bins contribute an exact zero singular value, which would make kappa infinite without
+// saying anything about the constrained part of the problem, so they are dropped and the
+// SVD runs on the surviving sub-matrix.
 double responseConditionNumber(const TH2 *h, const char *tag)
 {
     if (!h) return -1.;
@@ -197,11 +195,9 @@ void plot_purity_efficiency_response()
   gStyle->SetPaintTextFormat("4.3f");
 
 
-  // ---- disabled (kept for reference): UParT v1 / negTag, WP 0.868 ----
-  // TFile *f = TFile::Open("/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/"
-  //                        "RMatrix_Run3_btagWP868_template_for_fit_histos_3D_qcd_f_80_120_2.root","READ");
+  // btagWP<NNN> follows BTAG_WP in the run scripts.
   TFile *f = TFile::Open("/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/"
-                         "RMatrix_Run3_btagWP872_template_for_fit_histos_3D_qcd_f_80_120_2_upartv2.root","READ");
+                         "RMatrix_Run3_btagWP0712_template_for_fit_histos_3D_qcd_f_upartv2.root","READ");
 
   if(!f || f->IsZombie())
     {std::cout << "Cannot open file" << std::endl;

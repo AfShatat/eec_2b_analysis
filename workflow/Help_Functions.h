@@ -39,22 +39,13 @@
 #include <cmath>
 
 
-// ---------------------------------------------------------------------------
-//  Plot palette + style helpers. Defined here, at the top of the first header
-//  template_fit.cpp includes, so everything downstream (Draw_EEC.h, the fit
-//  macro itself) can use it without caring about include order.
-//
-//  Same hex values as plot_roc.cpp / apply_unfolding_2d.C, so a colour means the
-//  same thing across the whole analysis.
-// ---------------------------------------------------------------------------
+// Plot palette + style helpers, defined at the top of the first header template_fit.cpp
+// includes so everything downstream can use them regardless of include order. Same hex
+// values as plot_roc.cpp / apply_unfolding_2d.C.
 namespace ROCColor {
-  // Allocated at FIXED indices rather than via TColor::GetColor(), which hands out
-  // whichever slot happens to be free and so differs between sessions. Canvases are
-  // written into the summary .root file storing only the colour INDEX, so a
-  // session-dependent index comes back dangling and ROOT draws the curve black.
-  // Pinned slots mean any session with this header loaded reproduces the palette
-  // exactly. (Opening the .root file bare, without the header, still shows black --
-  // the pngs are the reference output.)
+    // Allocated at FIXED indices rather than via TColor::GetColor(), which hands out whichever
+    // slot is free and so differs between sessions. Canvases stored in the .root file keep only
+    // the colour INDEX, so a session-dependent one comes back dangling and ROOT draws black.
   Color_t make(Int_t idx, Int_t r, Int_t g, Int_t b) {
       if (!gROOT->GetColor(idx)) new TColor(idx, r / 255., g / 255., b / 255.);
       return (Color_t) idx;
@@ -69,11 +60,9 @@ namespace ROCColor {
   Color_t teal()   { return make(2406, 0x1F, 0x8A, 0x8A); }
 }
 
-// Category -> colour. Go through these, never through ROCColor directly, so the
-// convention lives in exactly one place:
+// Category -> colour. Go through these, never through ROCColor directly:
 //   ALL / 0B -> green,  1B -> blue,  2B -> red,  Data -> black,
-//   orange vs purple whenever exactly TWO variants of one quantity are compared
-//   (they belong to no category above, so neither can be misread as 0/1/2B).
+//   orange vs purple when exactly TWO variants of one quantity are compared.
 namespace TFColor {
   inline Color_t data()  { return kBlack;            }
   inline Color_t c0B()   { return ROCColor::green(); }
@@ -88,9 +77,8 @@ namespace TFColor {
   inline Color_t total() { return kGray + 3;         }
 }
 
-// A stacked MC template: solid fill in the category colour, outline one shade
-// darker so adjacent stack slices stay separable in greyscale print, and no
-// marker (a stack slice is an area, not a measurement).
+// A stacked MC template: solid fill in the category colour, outline one shade darker so
+// slices stay separable in greyscale, and no marker (a stack slice is an area).
 void styleTemplate(TH1 *h, Color_t c)
 {
     if (!h) return;
@@ -115,10 +103,8 @@ void styleData(TH1 *h)
     h->SetFillStyle(0);
 }
 
-// A curve carrying a category colour, where the SAME quantity is shown for two
-// sources: measured (solid, closed marker) vs simulated (dashed, open marker).
-// Colour says WHICH QUANTITY, style says DATA OR MC -- so the two never have to
-// fight over one channel, and a 4-curve plot still reads as 2 pairs.
+// A curve where the SAME quantity is shown for two sources: measured (solid, closed marker)
+// vs simulated (dashed, open marker). Colour says WHICH QUANTITY, style says DATA OR MC.
 void styleCurve(TH1 *h, Color_t c, bool is_data)
 {
     if (!h) return;
@@ -131,11 +117,9 @@ void styleCurve(TH1 *h, Color_t c, bool is_data)
     h->SetMarkerSize(0.9);
 }
 
-// CMS header above the frame: bold "CMS", italic sublabel to its right, beam and
-// energy right-aligned on the same line. NDC coordinates keyed off the pad
-// margins, so it tracks the frame rather than the data range.
-// sublabel: "Internal" for anything containing data, "Simulation Internal" for
-// MC-only canvases.
+// CMS header above the frame: bold "CMS", italic sublabel to its right, beam and energy
+// right-aligned. NDC coordinates keyed off the pad margins, so it tracks the frame.
+// sublabel: "Internal" for anything with data, "Simulation Internal" for MC-only.
 void drawCMSHeader(TPad *pad, const char *sublabel = "Internal",
                    const char *rightlabel = "pp #sqrt{s} = 5.36 TeV")
 {
@@ -147,20 +131,17 @@ void drawCMSHeader(TPad *pad, const char *sublabel = "Internal",
     // just outside the top-left corner, and at a smaller offset "CMS" lands on top of it.
     const double y     = 1.0 - pad->GetTopMargin() + 0.045;
 
-    // TLatex sizes are a fraction of the PAD HEIGHT. 0.050/0.038 came out oversized
-    // on these tall pads; 0.032/0.025 matches the header on the purity/efficiency
-    // canvases in plot_purity_efficiency_response.cpp, so the whole analysis carries
-    // the same CMS mark.
+    // TLatex sizes are a fraction of the PAD HEIGHT. 0.032/0.025 matches the header on the
+    // purity/efficiency canvases, so the whole analysis carries the same CMS mark.
     const double s_cms = 0.026;          // bold "CMS"
     const double s_sub = 0.020;          // italic sublabel and the beam/energy text
 
     TLatex tex;
     tex.SetNDC();
     tex.SetTextAlign(11);                                   // left / bottom
-    // Font 62, NOT 61. The trailing digit is the font PRECISION: 62 and the 52/42
-    // below are precision 2, sized as a fraction of the pad; 61 is precision 1, a
-    // "hardware" font the PostScript/PDF backend sizes by its own rule, which made
-    // "CMS" render enormous in pdf output while the sublabel beside it stayed right.
+    // Font 62, NOT 61: the trailing digit is the PRECISION. 62/52/42 are precision 2, sized
+    // as a fraction of the pad; 61 is precision 1, which the PDF backend sizes by its own
+    // rule and rendered "CMS" enormous.
     tex.SetTextFont(62); tex.SetTextSize(s_cms); tex.DrawLatex(left, y, "CMS");
     // Offset scaled off the "CMS" size rather than hardcoded, so changing s_cms
     // above keeps the sublabel tucked against it instead of drifting or colliding.
@@ -186,14 +167,10 @@ enum Variation {NOMINAL, VARIED0B_UP, VARIED0B_DOWN, FITRANGE_0_8,  FITRANGE_0_7
 TString varNames[NVAR] = {"nominal", "var0B_2", "var0B_0", "fitRange0to8", "fitRange0to7"};
 
 
-// -- Guard against the binning header and the input histograms drifting apart.
-// The 3D inputs are booked from binning_histos_small.h by create_files_for_template_fit.cpp
-// (mb_binsVector, dr_binsVector, jtpt_binsVector). The fit then loops over the histogram
-// axes while indexing those same arrays -- jtpt_binsVector[ibin_pt] for the pT labels,
-// dr_binsVector for the unfolding-binned fraction histograms -- so if the header is
-// edited (a pT bin added, say) without regenerating the input files, the loops run past
-// the end of the arrays and the results are silently wrong. Check it up front instead.
-// Adding a pT bin is then just: edit jtpt_binsVector, regenerate the inputs.
+// -- Guard against the binning header and the input histograms drifting apart. The 3D
+// inputs are booked from binning_histos_small.h, and the fit loops over the histogram axes
+// while indexing those same arrays, so editing the header without regenerating the inputs
+// would run past the end of the arrays. Check it up front instead.
 bool CheckAxisMatchesBinning(const TAxis* axis, Int_t nbins_expected,
                              const Double_t* edges_expected,
                              const char* what, const char* hist_name)
@@ -235,11 +212,9 @@ bool CheckInputBinning(const TH3D* h3)
 }
 
 
-// -- pT label shown on plots / legend headers.
-// Jets above jtpt_max are folded into the last pT bin (see jtpt_fill() in
-// binning_histos_small.h), so any bin whose upper edge is jtpt_max is open-ended and
-// is quoted as a threshold: the integrated bin reads "p_{T} > 80 GeV" and the last
-// bin "p_{T} > 100 GeV". Interior bins keep their closed range.
+// -- pT label shown on plots / legend headers. Jets above jtpt_max fold into the last pT
+// bin (jtpt_fill() in binning_histos_small.h), so a bin whose upper edge is jtpt_max is
+// open-ended and quoted as a threshold; interior bins keep their closed range.
 TString pt_label(double pt_first, double pt_last){
     if (pt_last == jtpt_max)
         return Form("p_{T} > %g GeV", pt_first);

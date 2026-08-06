@@ -15,9 +15,12 @@ public :
    TTree           *tree = nullptr;
 
    // Declaration of leaf types
-   Int_t           run;
-   Int_t           evt;
-   Int_t           lumi;
+   // Must match hiEvtAnalyzer/HiTree exactly: run/lumi are UInt_t and evt is ULong64_t
+   // there. Declaring them Int_t made SetBranchAddress refuse to bind all three, so
+   // run/lumi/evt were never read (and evt would not fit in 32 bits anyway).
+   UInt_t          run;
+   ULong64_t       evt;
+   UInt_t          lumi;
    // Event selections: Run3 data/reco MC
    Int_t          pprimaryVertexFilter;
    Float_t        vz;
@@ -402,11 +405,9 @@ private: // new to update tree destructor to suite the friend structure addition
 //tTree::tTree(TString rootf)
 tTree::tTree()
 {
-   // Zero-initialize every count leaf that drives a loop bound. If the matching
-   // branch is absent in the input file (or SetBranchAddress fails to bind it),
-   // GetEntry never touches the member, so without this it would hold garbage
-   // and loops like `for (itrk < nrefTrk)` would run off the fixed arrays and
-   // segfault. Zero => the loop simply runs 0 times.
+   // Zero-initialize every count leaf that drives a loop bound. If the branch is absent,
+   // GetEntry never touches the member, so it would hold garbage and loops would run off
+   // the fixed arrays. Zero => the loop simply runs 0 times.
    nref = 0;
    ntrk = 0;
    nrefTrk = 0;
@@ -479,13 +480,17 @@ void tTree::Init(TString rootf, Int_t dataType, Int_t RunN)
 
    TTree* t1 = (TTree*)fin->Get("hiEvtAnalyzer/HiTree");
    TTree* t2 = (TTree*)fin->Get("hltanalysis/HltTree");
+   // Do NOT call SetDirectory(nullptr) on a friend: detaching it from the file makes
+   // the parent GetEntry() skip it silently, so every branch read through the friend
+   // keeps whatever the member already held (run/lumi/evt came back as 0 that way).
+   // The friends stay owned by fin, which lives as long as this tTree.
    if(RunN == 3 && dataType == 0)
    {
-      TTree* t3 = (TTree*)fin->Get("skimanalysis/HltTree"); 
-      if (t3){tree->AddFriend(t3); t3->SetDirectory(nullptr);}
+      TTree* t3 = (TTree*)fin->Get("skimanalysis/HltTree");
+      if (t3){tree->AddFriend(t3);}
    }
-   if (t1){tree->AddFriend(t1); t1->SetDirectory(nullptr);}
-   if (t2) {tree->AddFriend(t2); t2->SetDirectory(nullptr);}
+   if (t1){tree->AddFriend(t1);}
+   if (t2) {tree->AddFriend(t2);}
 
 
 
@@ -649,12 +654,12 @@ void tTree::Init(TString rootf, Int_t dataType, Int_t RunN)
      tree->SetBranchAddress("refeta", refeta, &b_refeta);
      tree->SetBranchAddress("refy", refy, &b_refy);
      tree->SetBranchAddress("refphi", refphi, &b_refphi);
-     tree->SetBranchAddress("refm", refm, &b_refm);
-     tree->SetBranchAddress("refarea", refarea, &b_refarea);
+     if (tree->GetBranch("refm")) tree->SetBranchAddress("refm", refm, &b_refm);
+     if (tree->GetBranch("refarea")) tree->SetBranchAddress("refarea", refarea, &b_refarea);
      tree->SetBranchAddress("refdphijt", refdphijt, &b_refdphijt);
      tree->SetBranchAddress("refdrjt", refdrjt, &b_refdrjt);
-     tree->SetBranchAddress("refparton_pt", refparton_pt, &b_refparton_pt);
-     tree->SetBranchAddress("refparton_flavor", refparton_flavor, &b_refparton_flavor);
+     if (tree->GetBranch("refparton_pt")) tree->SetBranchAddress("refparton_pt", refparton_pt, &b_refparton_pt);
+     if (tree->GetBranch("refparton_flavor")) tree->SetBranchAddress("refparton_flavor", refparton_flavor, &b_refparton_flavor);
      tree->SetBranchAddress("refparton_flavorForB", refparton_flavorForB, &b_refparton_flavorForB);
      tree->SetBranchAddress("genChargedSum", genChargedSum, &b_genChargedSum);
      tree->SetBranchAddress("genHardSum", genHardSum, &b_genHardSum);
@@ -666,7 +671,7 @@ void tTree::Init(TString rootf, Int_t dataType, Int_t RunN)
      tree->SetBranchAddress("geneta", geneta, &b_geneta);
      tree->SetBranchAddress("geny", geny, &b_geny);
      tree->SetBranchAddress("genphi", genphi, &b_genphi);
-     tree->SetBranchAddress("genm", genm, &b_genm);
+     if (tree->GetBranch("genm")) tree->SetBranchAddress("genm", genm, &b_genm);
      tree->SetBranchAddress("gendphijt", gendphijt, &b_gendphijt);
      tree->SetBranchAddress("gendrjt", gendrjt, &b_gendrjt);
 
@@ -674,19 +679,16 @@ void tTree::Init(TString rootf, Int_t dataType, Int_t RunN)
      tree->SetBranchAddress("jtNbHad", jtNbHad, &b_jtNbHad);
 
      tree->SetBranchAddress("jtNcHad", jtNcHad, &b_jtNcHad);
-     tree->SetBranchAddress("jtNbPar", jtNbPar, &b_jtNbPar);
-     tree->SetBranchAddress("jtNcPar", jtNcPar, &b_jtNcPar);
+     if (tree->GetBranch("jtNbPar")) tree->SetBranchAddress("jtNbPar", jtNbPar, &b_jtNbPar);
+     if (tree->GetBranch("jtNcPar")) tree->SetBranchAddress("jtNcPar", jtNcPar, &b_jtNcPar);
   
      tree->SetBranchAddress("refptCh", refptCh, &b_refptCh);
      tree->SetBranchAddress("refNtrk", refNtrk, &b_refNtrk);
      
      tree->SetBranchAddress("weight", &weight, &b_weight);
-     //new
-     // Gen-track branches. Only bind them if they actually exist in this forest:
-     // binding a missing branch leaves nrefTrk uninitialized, and the gen-track
-     // loops (PartialBsAggregation) would then run off the fixed arrays and
-     // segfault. If absent, leave nrefTrk = 0 (set in the constructor) so those
-     // loops are simply skipped.
+      // Gen-track branches, bound only if they exist in this forest: binding a missing branch
+      // leaves nrefTrk uninitialized and PartialBsAggregation would run off the fixed arrays.
+      // If absent, nrefTrk stays 0 (set in the constructor) so those loops are skipped.
      if (tree->GetBranch("nrefTrk") && tree->GetBranch("refTrkJetId")) {
        tree->SetBranchAddress("refTrkJetId", refTrkJetId, &b_refTrkJetId);
        tree->SetBranchAddress("refTrkPdgId", refTrkPdgId, &b_refTrkPdgId);

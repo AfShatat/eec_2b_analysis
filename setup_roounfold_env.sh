@@ -1,10 +1,12 @@
 #!/bin/bash
 
-# Source before using ROOT/hadd on files containing RooUnfold objects.
+# Source this file before using ROOT/hadd on files containing RooUnfold objects.
 case $- in
   *u*) _roounfold_had_nounset=1 ;;
   *) _roounfold_had_nounset=0 ;;
 esac
+# It keeps the runtime consistent with the private RooUnfold build used by
+# run_agg_ntuple_chunks.sh.
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 WORK=${SCRIPT_DIR}
 ROOUNFOLD_DIR=${WORK}/RooUnfold_build_test
@@ -19,7 +21,7 @@ fi
 unset ROOT_INCLUDE_PATH
 unset CPLUS_INCLUDE_PATH
 unset CPATH
-# A loaded CMSSW runtime collides with the LCG view.
+# Avoid mixing an already-loaded CMSSW runtime with the LCG view.
 unset LD_LIBRARY_PATH
 unset PYTHONPATH
 
