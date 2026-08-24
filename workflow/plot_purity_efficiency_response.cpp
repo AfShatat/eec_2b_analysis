@@ -21,8 +21,9 @@
 
 // Plots go to /data_CMS so this folder keeps only code.
 // const char* PLOT_OUTDIR = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/results";
-// const char* PLOT_OUTDIR = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/results/unfolding_upartv2/Response_qcd_upartv2";
-const char* PLOT_OUTDIR = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/results/unfolding_bjet_upartv2/Response_bjet_upartv2";
+// const char* PLOT_OUTDIR = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/results/unfolding_upartv2/Response_qcd_upartv2"; // qcd Rmatrix
+const char* PLOT_OUTDIR = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/results/unfolding_bjet_upartv2/Response_bjet_upartv2"; // bjet Rmatrix
+// const char* PLOT_OUTDIR = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/results/unfolding_Rqcdbjet_upartv2/Response_bjetqndqcd_upartv2"; // qcd+bjet merged matrix 
 
 
 namespace ROCColor {
@@ -199,14 +200,20 @@ void plot_purity_efficiency_response()
 
 
   // btagWP<NNN> follows BTAG_WP in the run scripts.
-  // TFile *f = TFile::Open("/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/"
-                         // "RMatrix_Run3_btagWP0712_template_for_fit_histos_3D_qcd_f_upartv2.root","READ");
+  // TFile *f = TFile::Open("/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/"    
+                     // "RMatrix_Run3_btagWP0712_template_for_fit_histos_3D_qcd_f_upartv2.root","READ");
+  
+
+  /// qcd only
   // TFile *f = TFile::Open("/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/MergedResult_btagWP712_MattProd/"
                          // "RMatrix_Run3_btagWP712_template_for_fit_histos_3D_qcd_f_80_9999_2_merged.root","READ"); // QCD matrix 
-
-    TFile *f = TFile::Open("/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/bJet/agg_ntuple_chunks/MergedResult_btagWP712_MattProd/"
+  /// bjet only 
+  TFile *f = TFile::Open("/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/bJet/agg_ntuple_chunks/MergedResult_btagWP712_MattProd/"
                          "RMatrix_Run3_btagWP712_template_for_fit_histos_3D_bjet_f_80_9999_2_merged.root","READ"); // bjet matrix
 
+  /// Merged Rmatrix: qcd + bjet
+  // TFile *f = TFile::Open("/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/bJet/agg_ntuple_chunks/MergedResult_btagWP712_MattProd/"
+  //                           "RMatrix_Run3_btagWP712_template_for_fit_histos_3D_bjet_qcd_merged.root", "READ"); // merged Rmatrix (qcd + bjet)
 
 
   if(!f || f->IsZombie())
