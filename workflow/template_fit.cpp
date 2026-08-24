@@ -236,10 +236,10 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
 
     // Fitting - loop over dr and jtpt entries
     // Bin0: is integarted over the range 
-    for(Int_t ibin_pt = 0; ibin_pt <= bins_pt; ibin_pt++){
-    // for(Int_t ibin_pt = 2 ; ibin_pt <= 2; ibin_pt++){
-        for(Int_t ibin_dr = 0; ibin_dr <= N_bins_dr; ibin_dr++){
-        // for(Int_t ibin_dr = 0; ibin_dr <= N_bins_dr; ibin_dr++){
+    for(Int_t ibin_pt = 1; ibin_pt <= bins_pt; ibin_pt++){
+    // for(Int_t ibin_pt = 1 ; ibin_pt <= 2; ibin_pt++){ // test 
+        for(Int_t ibin_dr = 1; ibin_dr <= N_bins_dr; ibin_dr++){
+        // for(Int_t ibin_dr = 0; ibin_dr <= 1; ibin_dr++){ // test 
             
             // define slice
             Int_t SliceFirstbin_dr = ibin_dr;
@@ -331,7 +331,7 @@ void do_template_fit_combined(const TString &HighEGdata_name, const TString &Low
                 // cout << "Dijet: 2B/(1B + 2B) = " << int2/(int2 + int1) << endl;
                 // std::cout << "int2 h_bb_bjet=" << int2_bjet << std::endl;
                 // std::cout << "int1 h_b_bjet =" << int1_bjet << std::endl;
-                // cout << "2B/(2B + 1B) in qcd sample = " << int2_bjet/(int2_bjet + int1_bjet) << endl;
+                // cout << "Bjet: 2B/(2B + 1B) = " << int2_bjet/(int2_bjet + int1_bjet) << endl;
                 // cout << " Dijet: 0B/(1B+2B) = " << int0/(int2 + int1) << endl;
 
             // --- Prepare PDFs for template fit
@@ -1134,10 +1134,10 @@ void Draw_template_Run3(TString &templates, TString pT_selection, TString folder
  
     // Fitting - loop over dr and jtpt entries
     // Bin0: is integarted over the range 
-    for(Int_t ibin_pt = 0; ibin_pt <= bins_pt; ibin_pt++){
-    // for(Int_t ibin_pt = 0 ; ibin_pt <= 1; ibin_pt++){
-        for(Int_t ibin_dr = 0; ibin_dr <= N_bins_dr; ibin_dr++){
-        // for(Int_t ibin_dr = 0; ibin_dr <= 0; ibin_dr++){
+    for(Int_t ibin_pt = 1; ibin_pt <= bins_pt; ibin_pt++){
+    // for(Int_t ibin_pt = 1 ; ibin_pt <= 1; ibin_pt++){
+        for(Int_t ibin_dr = 1; ibin_dr <= N_bins_dr; ibin_dr++){
+        // for(Int_t ibin_dr = 1; ibin_dr <= 0; ibin_dr++){
             
             // define slice
             Int_t SliceFirstbin_dr = ibin_dr;
@@ -1844,7 +1844,8 @@ void template_fit(){
     // -- Output folder to save the result of the tests 
     gSystem->mkdir(sDirname, kTRUE);// Predefined in Help.h -- holds the root files
     gSystem->mkdir(sDirname_www, kTRUE);// single flat folder holding every png
-    TString folder = Form("/home/llr/cms/zaidan/analysis_lise/eec_2b_analysis/TemplateFit_Run3/%s/", sDirname.Data()); // this is sDirname 
+    // TString folder = Form("/home/llr/cms/zaidan/analysis_lise/eec_2b_analysis/TemplateFit_Run3/%s/", sDirname.Data()); // this is sDirname 
+    TString folder = Form("%s", sDirname.Data()); // this is sDirname 
         cout << "Output folder path: "<< folder << endl;
 
     Int_t RunN = 3; // 3; 
@@ -1868,10 +1869,14 @@ void template_fit(){
     // -- Set data/MC samples to use
     if (RunN == 3){
         alsoLowEG = false; 
-        also_bjet = false;
+        also_bjet = true;
         // btagWP<NNN> follows BTAG_WP in the run scripts.
-        dataset_HG = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/HardProbes/agg_template_chunks/Run3_btagWP0712_template_for_fit_histos_3D_data_fMCGEN_upartv2.root";
-        templates_dijet = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/Run3_btagWP0712_template_for_fit_histos_3D_qcd_fMCGEN_upartv2.root";
+        // dataset_HG = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/HardProbes/agg_template_chunks/Run3_btagWP0712_template_for_fit_histos_3D_data_fMCGEN_upartv2.root"; // Does not exist! 
+        // templates_dijet = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/Run3_btagWP0712_template_for_fit_histos_3D_qcd_fMCGEN_upartv2.root";
+        
+        dataset_HG = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/HardProbes/agg_template_chunks/Run3_btagWP712_template_for_fit_histos_3D_data_f_80_9999_2MCGEN.root";
+        templates_dijet = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/MergedResult_btagWP712_MattProd/Run3_btagWP712_template_for_fit_histos_3D_qcd_f_80_9999_2MCGEN_merged.root";
+        templates_bjet = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/bJet/agg_ntuple_chunks/MergedResult_btagWP712_MattProd/Run3_btagWP712_template_for_fit_histos_3D_bjet_f_80_9999_2MCGEN_merged.root";
         fout_name = Form("Run%d_TemplateFits_histos_3d_%s.root", RunN, pT_selection.Data());
     }
     else if (RunN == 2){
@@ -1900,12 +1905,13 @@ void template_fit(){
         // --  Loop over variations on templates: one root file per variation 
         // --  other png drawings are on seperate directories, for simplisity.
         for (int ivar = 0; ivar < 4; ivar++) //
+        // for (int ivar = 0; ivar < 1; ivar++) //
         {
             TString newfout_name = varNames[ivar]+ "_" + fout_name;
             do_template_fit_combined(dataset_HG,dataset_LG,templates_dijet, templates_bjet,  pT_selection, folder, newfout_name, alsoLowEG, also_bjet, (Variation) ivar); // default: NOMINAL variation 
-        
-            // for(Int_t ibin_pt = 0; ibin_pt <= 1; ibin_pt++) {  // test 
-            for(Int_t ibin_pt = 0; ibin_pt <= bins_pt; ibin_pt++){
+
+            // for(Int_t ibin_pt = 1; ibin_pt <= 1; ibin_pt++) {  // test 
+            for(Int_t ibin_pt = 1; ibin_pt <= bins_pt; ibin_pt++){
                 /// Draw S/B fractions 
                 // -- to test Draw fraction only: READ foutputPlots_dijet instead of RECREATE
                     // TFile *foutputPlots_dijet = new TFile(Form("%s/%s", sDirname.Data(), sfoutputPlots_dijet.Data()), "Update"); 
@@ -1917,16 +1923,13 @@ void template_fit(){
                 /// Draw EEC 
                 draw_eec_simple(newfout_name, foutputPlots_dijet ,folder, also_bjet, ibin_pt, (Variation) ivar);
 
-           // }
-
-
             } // end loop over ibin_pt
 
         } // end loop over ivar
 
 
-    
-    
+
+
         //-- Get 0B systematics 
         cout << "Calculate systematic uncertaintiy " << endl;
         TFile *fsys = new TFile( Form("%s/Result_syst_uncert_templatefit.root", sDirname.Data()),"recreate");
@@ -1934,7 +1937,9 @@ void template_fit(){
                     // TFile *foutputPlots_dijet = new TFile(Form("%s/%s", sDirname.Data(), sfoutputPlots_dijet.Data()), "Update"); 
                     // if (! foutputPlots_dijet->IsOpen()){ foutputPlots_dijet = new TFile(Form("%s/%s", sDirname.Data(), sfoutputPlots_dijet.Data()), "Read"); }
                     // if (!foutputPlots_dijet || foutputPlots_dijet->IsZombie()) {std::cout << "Error opening file!" << std::endl; return;}
-            for(Int_t ibin_pt = 0; ibin_pt <= bins_pt; ibin_pt++) {
+            for(Int_t ibin_pt = 1; ibin_pt <= bins_pt; ibin_pt++) {
+            // for(Int_t ibin_pt = 1; ibin_pt <= 1; ibin_pt++) {  // test 
+
                     draw_variation_uncertainity(foutputPlots_dijet, fsys, ibin_pt);
             }
 

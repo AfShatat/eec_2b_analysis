@@ -133,8 +133,8 @@ void drawCMSHeader(TPad *pad, const char *sublabel = "Internal",
 
     // TLatex sizes are a fraction of the PAD HEIGHT. 0.032/0.025 matches the header on the
     // purity/efficiency canvases, so the whole analysis carries the same CMS mark.
-    const double s_cms = 0.026;          // bold "CMS"
-    const double s_sub = 0.020;          // italic sublabel and the beam/energy text
+    const double s_cms = 0.045; // 0.026 is small          // bold "CMS"
+    const double s_sub = 0.037; // 0.020 is small         // italic sublabel and the beam/energy text
 
     TLatex tex;
     tex.SetNDC();
@@ -157,9 +157,18 @@ void drawCMSHeader(TPad *pad, const char *sublabel = "Internal",
 // TString sDirname_www = "TemplateFits_Run3_minHLT60_LinearBin_www"; //  web version only
 // ---- disabled (kept for reference): fit output next to the macro ----
 // TString sDirname = "TemplateFits_Run3_minHLT60_LinearBin_upartv2";
-TString sDirname = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/results/TemplateFits_Run3_minHLT60_LinearBin_upartv2";
+// TString sDirname = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/results/TemplateFits_Run3_minHLT60_LinearBin_upartv2";
 // TString sDirname_www = "TemplateFits_Run3_minHLT60_LinearBin_upartv2_www"; //  web version only
-TString sDirname_www = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/results/TemplateFits_Run3_minHLT60_LinearBin_upartv2_www"; //  web version only
+// TString sDirname_www = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/results/TemplateFits_Run3_minHLT60_LinearBin_upartv2_www"; //  web version only
+
+// -- UPartv2: QCD + Bjet
+// TString sDirname = "/home/llr/cms/shatat/CMSAnalysis/eec_2b_analysis/workflow/TemplateFit_Run3/TemplateFits_btagWP712_qcd_upartv2"; // qcd alone 
+TString sDirname = "/home/llr/cms/shatat/CMSAnalysis/eec_2b_analysis/workflow/TemplateFit_Run3/TemplateFits_btagWP712_qcdbjet_upartv2";
+TString sDirname_www = sDirname;
+
+
+// TString sDirname = "/home/llr/cms/shatat/CMSAnalysis/eec_2b_analysis/workflow/TemplateFit_Run3/testStyle";
+// TString sDirname_www = sDirname;
 
 
 // -- For systematic uncertainti study 

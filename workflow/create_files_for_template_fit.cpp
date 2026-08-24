@@ -2256,10 +2256,9 @@ void filter_b_bb_as_data_and_mc(const AnalysisConfig& cfg) {
 // NOTE: pT_high (4th) and foldPtOverflow (last) were removed; the upper pT edge lives in
 // jtpt_binsVector in binning_histos_small.h. Old callers must drop the 4th argument.
 void create_files_for_template_fit(Int_t RunN = 3, Int_t dataType = 2, Float_t pT_low = 80, Float_t etaCut = 2, Int_t n = 1,
-                                   bool btag = true, bool isMC = true, Double_t btagWP = 0.868, bool makeTemplates = true, bool createRmatrix = true,
-                                   bool makeAggNtuple = false, Long64_t ev_first = 0, Long64_t ev_last = -1, const char* inputFileOverride = "", const char* outputFolderOverride = ""){
+                                   bool btag = true, bool isMC = true, Double_t btagWP = 0.712, bool makeTemplates = true, bool createRmatrix = true,
+                                   bool makeAggNtuple = true, Long64_t ev_first = 0, Long64_t ev_last = -1, const char* inputFileOverride = "", const char* outputFolderOverride = ""){
  // load at prompt: gSystem->Load("libGenVector");
-
  // -- test use of central configuration
   AnalysisConfig cfg =  buildConfig(
     RunN,

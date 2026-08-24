@@ -106,17 +106,32 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
     const Color_t teal = ROCColor::teal();
 
     // btagWP<NNN> follows BTAG_WP in the run scripts.
-    TString filename_template_fit = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/results/TemplateFits_Run3_minHLT60_LinearBin_upartv2/nominal_Run3_TemplateFits_histos_3d_80_inf.root";
+    //--  Signal fraction from template fit
+    // TString filename_template_fit = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/results/TemplateFits_Run3_minHLT60_LinearBin_upartv2/nominal_Run3_TemplateFits_histos_3d_80_inf.root"; // Zoe 
+    // TString filename_template_fit = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/results/TemplateFit_Run3/TemplateFits_btagWP712_qcd_upartv2/nominal_Run3_TemplateFits_histos_3d_80_inf.root"; // fit to qcd sample
+    TString filename_template_fit = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/results/TemplateFit_Run3/TemplateFits_btagWP712_qcdbjet_upartv2/nominal_Run3_TemplateFits_histos_3d_80_inf.root"; // fit to qcd and bjet sample
+
     std::cout << "Using template file: " << filename_template_fit << std::endl;
 
-    TString filename_response = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/RMatrix_Run3_btagWP0712_template_for_fit_histos_3D_qcd_f_upartv2.root";
+    //-- RMatrix from MC ntuples 
+    // TString filename_response = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/RMatrix_Run3_btagWP0712_template_for_fit_histos_3D_qcd_f_upartv2.root"; // Zoe 
+    // TString filename_response = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/MergedResult_btagWP712_MattProd/RMatrix_Run3_btagWP712_template_for_fit_histos_3D_qcd_f_80_9999_2_merged.root"; // Afnan (qcd matrix)
+    // TString filename_response = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/bJet/agg_ntuple_chunks/MergedResult_btagWP712_MattProd/RMatrix_Run3_btagWP712_template_for_fit_histos_3D_bjet_f_80_9999_2_merged.root"; // Afnan (bjet matrix)
+    TString filename_response = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/bJet/agg_ntuple_chunks/MergedResult_btagWP712_MattProd/RMatrix_Run3_btagWP712_template_for_fit_histos_3D_bjet_qcd_merged.root"; // Afnan (bjet+qcd merged matrix)
+
     std::cout << "Using response file: " << filename_response << std::endl;
 
+    // Dataset ntuples  to unfold: data or MC  (test mode decision)
     // Modes 0/1 unfold MC (h3D_bb / h3D_pseudodata_bb), which live in the MCGEN file.
     // Mode 2 unfolds real data from the data file.
     TString filename_data = is_data
-        ? "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/HardProbes/agg_template_chunks/Run3_btagWP0712_template_for_fit_histos_3D_data_fMCGEN_upartv2.root"
-        : "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/Run3_btagWP0712_template_for_fit_histos_3D_qcd_fMCGEN_upartv2.root";
+        // ? "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/HardProbes/agg_template_chunks/Run3_btagWP0712_template_for_fit_histos_3D_data_fMCGEN_upartv2.root"
+        // : "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/Run3_btagWP0712_template_for_fit_histos_3D_qcd_fMCGEN_upartv2.root";
+        ? "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/HardProbes/agg_template_chunks/Run3_btagWP712_template_for_fit_histos_3D_data_f_80_9999_2MCGEN.root" // data templates 
+        // : "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/MergedResult_btagWP712_MattProd/Run3_btagWP712_template_for_fit_histos_3D_qcd_f_80_9999_2MCGEN_merged.root"; // qcd sample templates 
+        : "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/bJet/agg_ntuple_chunks/MergedResult_btagWP712_MattProd/Run3_btagWP712_template_for_fit_histos_3D_bjet_f_80_9999_2MCGEN_merged.root"; // bjet sample templates 
+
+
     std::cout << "Getting data from " << filename_data << std::endl; //
     //Select central pT bin
     int ibin_pt = 2;
@@ -156,7 +171,7 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
     const Float_t  title_size = 15. * font_scale;
     const Float_t  legend_size = 15. * font_scale;
     // One offset for every axis title, so they all sit the same distance from their numbers.
-    const Float_t  title_offset = 1.0;
+    const Float_t  title_offset = 3.0; // 1.0 not enough 
 
     // ---- Grab response matrix + corrections
     TString fname_unfolding = filename_response;
@@ -241,16 +256,28 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
     // purity-corrected data -> matched reco (numerator); uncorrected data -> all reco (denominator).
     if (split_test){
         std::cout << "\t----> Doing split test" << std::endl;
-        h_full_purity = getOrWarn<TH2D>(fin_unfolding, "h_full_pseudo_purity_tf");
-        h_full_efficiency = getOrWarn<TH2D>(fin_unfolding, "h_full_pseudo_efficiency_tf");
+        // --- 
+        // h_full_purity = getOrWarn<TH2D>(fin_unfolding, "h_full_pseudo_purity_tf"); // wrong ratio due to merged files 
+        // h_full_efficiency = getOrWarn<TH2D>(fin_unfolding, "h_full_pseudo_efficiency_tf"); // wrong ratio due to merged files 
+        // --- 
+
+        h_full_purity = ratioFromCounts("h_full_pseudo_purity_numerator_tf", "h_full_pseudo_purity_denominator_tf", "h_pseudo_purity");
+        h_full_efficiency = ratioFromCounts("h_full_pseudo_efficiency_numerator_tf", "h_full_pseudo_efficiency_denominator_tf", "h_pseudo_efficiency");
+        
         h_mc_reco = getOrWarn<TH2D>(fin_unfolding, apply_purity ? "h_full_pseudo_purity_numerator_tf"
                                                                 : "h_full_pseudo_purity_denominator_tf");
         response = getOrWarn<RooUnfoldResponse>(fin_unfolding, "response_tf_pseudo_full");
         h_mc_true_no_eff = getOrWarn<TH2D>(fin_unfolding, "h_full_pseudo_efficiency_numerator_tf");
     }
     else {
-        h_full_purity = getOrWarn<TH2D>(fin_unfolding, "h_full_purity_tf");
-        h_full_efficiency = getOrWarn<TH2D>(fin_unfolding, "h_full_efficiency_tf");
+        // ---  
+        // h_full_purity = getOrWarn<TH2D>(fin_unfolding, "h_full_purity_tf"); // Wrong ratio due to merged files 
+        // h_full_efficiency = getOrWarn<TH2D>(fin_unfolding, "h_full_efficiency_tf"); // wrong ratio due to merged files 
+        // --- 
+
+        h_full_purity     = ratioFromCounts("h_full_purity_numerator_tf", "h_full_purity_denominator_tf", "h_purity");
+        h_full_efficiency = ratioFromCounts("h_full_efficiency_numerator_tf", "h_full_efficiency_denominator_tf", "h_efficiency");
+
         h_mc_reco = getOrWarn<TH2D>(fin_unfolding, apply_purity ? "h_full_purity_numerator_tf"
                                                                 : "h_full_purity_denominator_tf");
         response = getOrWarn<RooUnfoldResponse>(fin_unfolding, "response_tf_full");
@@ -508,8 +535,12 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
         TPad *pad_main  = new TPad(Form("pad_cmp_main_%d",  ibin_pt), "", 0., 0.3, 1., 1.);
         TPad *pad_ratio = new TPad(Form("pad_cmp_ratio_%d", ibin_pt), "", 0., 0.,  1., 0.3);
         for (TPad *p : {pad_main, pad_ratio}) { p->SetTicks(1, 0); p->SetFillColor(0); }
-        pad_main ->SetMargin(0.13, 0.05, 0.00, 0.08);
-        pad_ratio->SetMargin(0.13, 0.05, 0.32, 0.00);
+        // pad_main ->SetMargin(0.13, 0.05, 0.00, 0.08);
+        // pad_ratio->SetMargin(0.13, 0.05, 0.32, 0.00);
+        pad_main->SetMargin(0.1, 0.1, 0.0, 0.1);
+        pad_ratio->SetMargin(0.1, 0.1, 0.23, 0.0);
+
+
         c_cmp->cd(); pad_main->Draw(); pad_ratio->Draw();
 
         // ----- top: raw EEC(dr) with each correction -----
@@ -566,9 +597,10 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
         r_2sv->GetYaxis()->SetNdivisions(505);
         r_2sv->GetXaxis()->SetTitle("#Delta r");
         r_2sv->GetXaxis()->CenterTitle(true);
+
         // Precision-43 offsets scale off the (short) ratio-pad height: 3.2 put the title clean
         // off the bottom of the canvas, so no x title was drawn at all. 1.3 lands it under the labels.
-        r_2sv->GetXaxis()->SetTitleFont(font_code); r_2sv->GetXaxis()->SetTitleSize(title_size); r_2sv->GetXaxis()->SetTitleOffset(1.3);
+        r_2sv->GetXaxis()->SetTitleFont(font_code); r_2sv->GetXaxis()->SetTitleSize(title_size); r_2sv->GetXaxis()->SetTitleOffset(title_offset);
         r_2sv->GetXaxis()->SetLabelFont(font_code); r_2sv->GetXaxis()->SetLabelSize(label_size);
         r_2sv->Draw("PE X0"); r_btag->Draw("PE X0 SAME"); r_eec->Draw("PE X0 SAME");
 
@@ -714,7 +746,7 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
         h_data_purity_corrected_2D->GetYaxis()->CenterTitle(true);
         h_data_purity_corrected_2D->GetYaxis()->SetTitleFont(font_code);
         h_data_purity_corrected_2D->GetYaxis()->SetTitleSize(title_size);
-        h_data_purity_corrected_2D->GetYaxis()->SetTitleOffset(1.55);
+        h_data_purity_corrected_2D->GetYaxis()->SetTitleOffset(1.5);
         h_data_purity_corrected_2D->GetYaxis()->SetLabelFont(font_code);
         h_data_purity_corrected_2D->GetYaxis()->SetLabelSize(label_size);
         h_data_purity_corrected_2D->GetXaxis()->SetLabelSize(0); // x labels belong to the ratio pad
@@ -783,8 +815,7 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
 
         pad_main->SetMargin(0.1, 0.1, 0.0, 0.1);
         pad_ratio->SetMargin(0.1, 0.1, 0.23, 0.0);
-        
-    
+
     
         // Attach the pads to the canvas before drawing into them, so gPad and the pad's
         // primitive list agree at every Draw().
@@ -794,8 +825,8 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
 
         pad_main->cd();
         h_data_purity_corrected_2D->GetXaxis()->SetRange(ibin_dr_min, ibin_dr_max);
-        h_data_purity_corrected_2D->GetYaxis()->SetTitleOffset(title_offset);
         h_data_purity_corrected_2D->Draw("PE X0");
+
         //h_data_unfolded_2D->Draw("pe1 same");
         h_mc_reco_2D->Draw("PE X0 same");
         h_data_fully_corrected_2D->Draw("PE X0 same");
@@ -825,18 +856,23 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
                 test_info_text->DrawLatex(0.57, 0.55,
                     Form("refold #chi^{2}/ndf = %.2f", gof_all.chi2ndf()));
                 test_info_text->DrawLatex(0.57, 0.50, Form("p = %.3f", gof_all.pvalue));
+                test_info_text->DrawLatex(0.57, 0.45, Form("Response matrix CN = %.1f", cond_number));
+            }
+            else {
+                test_info_text->DrawLatex(0.57, 0.55, Form("Response matrix CN = %.1f", cond_number));
             }
         }
         else {
             test_info_text->DrawLatex(0.57, 0.65, "Matrix inversion unfolding");
+            test_info_text->DrawLatex(0.57, 0.60, Form("Response matrix CN = %.1f", cond_number));
         }
         //drawHeader();
 
         // CMS Internal above the top axis (outside the frame)
         TLatex cms_bl; cms_bl.SetNDC();
-        cms_bl.SetTextFont(62); cms_bl.SetTextSize(0.042); cms_bl.DrawLatex(0.10, 0.945, "CMS");
-        cms_bl.SetTextFont(52); cms_bl.SetTextSize(0.034); cms_bl.DrawLatex(0.205, 0.945, "Internal");
-        cms_bl.SetTextFont(42); cms_bl.SetTextSize(0.034); cms_bl.DrawLatex(0.66, 0.945, "pp #sqrt{s} = 5.36 TeV");
+        cms_bl.SetTextFont(62); cms_bl.SetTextSize(0.045); cms_bl.DrawLatex(0.10, 0.945, "CMS"); // cms_bl.SetTextSize(0.042); 
+        cms_bl.SetTextFont(52); cms_bl.SetTextSize(0.037); cms_bl.DrawLatex(0.205, 0.945, "Internal"); // cms_bl.SetTextSize(0.034); 
+        cms_bl.SetTextFont(42); cms_bl.SetTextSize(0.037); cms_bl.DrawLatex(0.66, 0.945, "pp #sqrt{s} = 5.36 TeV"); // cms_bl.SetTextSize(0.034);
 
         pad_main->RedrawAxis();
 
@@ -889,7 +925,7 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
         for (TAxis *ax : { h_mc_gen_reco_ratio->GetXaxis(), h_mc_gen_reco_ratio->GetYaxis() }) {
             ax->SetTitleFont(font_code);
             ax->SetTitleSize(title_size);
-            ax->SetTitleOffset(title_offset);
+            ax->SetTitleOffset(title_offset); //title_offset = 1.0 default   not enough for the unfolding plot 
             ax->SetLabelFont(font_code);
             ax->SetLabelSize(label_size);
         }
@@ -927,6 +963,25 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
         h_data_mc_reco_ratio->GetXaxis()->SetLabelSize(16);
         h_data_mc_reco_ratio->GetXaxis();
        
+
+        // -- Add style also for h_mc_gen_reco_ratio (drawn first in ratio)
+        h_mc_gen_reco_ratio->GetYaxis()->SetRangeUser(0.5, 2);
+        h_mc_gen_reco_ratio->GetYaxis()->SetTitle("ratio");
+        h_mc_gen_reco_ratio->GetYaxis()->CenterTitle(true);
+        h_mc_gen_reco_ratio->GetYaxis()->SetTitleFont(font_code);
+        h_mc_gen_reco_ratio->GetYaxis()->SetTitleSize(title_size);
+        h_mc_gen_reco_ratio->GetYaxis()->SetTitleOffset(1.5);
+        h_mc_gen_reco_ratio->GetYaxis()->SetLabelFont(font_code);
+        h_mc_gen_reco_ratio->GetYaxis()->SetLabelSize(label_size);
+        h_mc_gen_reco_ratio->GetYaxis()->SetNdivisions(505);
+        h_mc_gen_reco_ratio->GetXaxis()->SetTitle("#Delta r");
+        h_mc_gen_reco_ratio->GetXaxis()->CenterTitle(true);
+        h_mc_gen_reco_ratio->GetXaxis()->SetTitleFont(font_code);
+        h_mc_gen_reco_ratio->GetXaxis()->SetTitleSize(title_size);
+
+       
+
+        
 
         // The unity line and the gap bands span the axis actually plotted, not the full dr
         // range: the two disagree as soon as ibin_dr_min/ibin_dr_max restrict the view.
@@ -1228,14 +1283,51 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
 //              Bayesian only -- matrix inversion has no iterations to scan.
 // e.g.  root -l 'apply_unfolding_2d.C(2, true, true)'   // data, Bayesian, scan the iterations
 void apply_unfolding_2d(int test_mode = 2, bool unfoldBayes = true, bool scan_niter = false){
-    TString dataset = "data";
+    TString dataset = "data" ; 
+    // TString dataset = "test_qcdtoZoeqcd"; // test mode
+    // TString dataset = "data_qcdRmatrix_correctedPurity";
+    test_mode = 2; // 0 1 2 
+    unfoldBayes = false; // false true 
+    scan_niter = false;
+
+
     // ---- disabled (kept for reference): previous output location ----
     // TString folder = "/data_CMS/cms/zaidan/analysis_lise/Run3/";
-    TString folder = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/results/unfolding_upartv2/";
+    // TString folder = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/results/unfolding_upartv2/"; // Zoe directory
+    
+    // TString folder = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/results/unfolding_qcd_upartv2/"; // Afnan 
+    // TString folder = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/results/unfolding_bjet_upartv2/"; // Afnan 
+    // TString folder = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/results/unfolding_Rqcdbjet_upartv2/"; // Afnan 
+
+    TString folder = "/home/llr/cms/shatat/CMSAnalysis/eec_2b_analysis/workflow/unfolding_test/"; // test 
+
     gSystem->mkdir(folder, kTRUE);
     TString pT_selection = "80_inf";
     bool btag = true;
     Int_t n = 1;
+
+    // ---- Log file ----
+    TDatime now;
+    TString timestamp = Form(
+        "%04d-%02d-%02d_%02d-%02d-%02d",
+        now.GetYear(),
+        now.GetMonth(),
+        now.GetDay(),
+        now.GetHour(),
+        now.GetMinute(),
+        now.GetSecond()
+    );
+    TString label;
+    label += unfoldBayes ? "_bayesian" : "_MI";
+    if(test_mode==0)  label += "_full_closure";
+    if(test_mode==1)  label += "_split_test";
+    if(test_mode==2)  label += "_data";
+    if(scan_niter)    label += "_iterative";
+    TString logfile = folder +  "unfolding" + label + "_" +  timestamp + ".log";
+    gSystem->RedirectOutput(logfile);  // "a" = append
 	apply_unfolding(dataset, folder, btag, n, pT_selection, test_mode, unfoldBayes, scan_niter);
+
+    // Restore terminal output
+    gSystem->RedirectOutput(nullptr);
 
 }
