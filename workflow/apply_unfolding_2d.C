@@ -108,15 +108,15 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
     // btagWP<NNN> follows BTAG_WP in the run scripts.
     //--  Signal fraction from template fit
     // TString filename_template_fit = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/results/TemplateFits_Run3_minHLT60_LinearBin_upartv2/nominal_Run3_TemplateFits_histos_3d_80_inf.root"; // Zoe 
-    // TString filename_template_fit = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/results/TemplateFit_Run3/TemplateFits_btagWP712_qcd_upartv2/nominal_Run3_TemplateFits_histos_3d_80_inf.root"; // fit to qcd sample
-    TString filename_template_fit = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/results/TemplateFit_Run3/TemplateFits_btagWP712_qcdbjet_upartv2/nominal_Run3_TemplateFits_histos_3d_80_inf.root"; // fit to qcd and bjet sample
+    TString filename_template_fit = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/results/TemplateFit_Run3/TemplateFits_btagWP712_qcd_upartv2/nominal_Run3_TemplateFits_histos_3d_80_inf.root"; // fit to qcd sample
+    // TString filename_template_fit = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/results/TemplateFit_Run3/TemplateFits_btagWP712_qcdbjet_upartv2/nominal_Run3_TemplateFits_histos_3d_80_inf.root"; // fit to qcd and bjet sample
 
     std::cout << "Using template file: " << filename_template_fit << std::endl;
 
     //-- RMatrix from MC ntuples 
     // TString filename_response = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/RMatrix_Run3_btagWP0712_template_for_fit_histos_3D_qcd_f_upartv2.root"; // Zoe 
-    // TString filename_response = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/MergedResult_btagWP712_MattProd/RMatrix_Run3_btagWP712_template_for_fit_histos_3D_qcd_f_80_9999_2_merged.root"; // Afnan (qcd matrix)
-    TString filename_response = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/bJet/agg_ntuple_chunks/MergedResult_btagWP712_MattProd/RMatrix_Run3_btagWP712_template_for_fit_histos_3D_bjet_f_80_9999_2_merged.root"; // Afnan (bjet matrix)
+    TString filename_response = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/MergedResult_btagWP712_MattProd/RMatrix_Run3_btagWP712_template_for_fit_histos_3D_qcd_f_80_9999_2_merged.root"; // Afnan (qcd matrix)
+    // TString filename_response = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/bJet/agg_ntuple_chunks/MergedResult_btagWP712_MattProd/RMatrix_Run3_btagWP712_template_for_fit_histos_3D_bjet_f_80_9999_2_merged.root"; // Afnan (bjet matrix)
     // TString filename_response = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/bJet/agg_ntuple_chunks/MergedResult_btagWP712_MattProd/RMatrix_Run3_btagWP712_template_for_fit_histos_3D_bjet_qcd_merged.root"; // Afnan (bjet+qcd merged matrix)
 
     std::cout << "Using response file: " << filename_response << std::endl;
@@ -128,8 +128,8 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
         // ? "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/HardProbes/agg_template_chunks/Run3_btagWP0712_template_for_fit_histos_3D_data_fMCGEN_upartv2.root"
         // : "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/Run3_btagWP0712_template_for_fit_histos_3D_qcd_fMCGEN_upartv2.root";
         ? "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/HardProbes/agg_template_chunks/Run3_btagWP712_template_for_fit_histos_3D_data_f_80_9999_2MCGEN.root" // data templates 
-        // : "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/MergedResult_btagWP712_MattProd/Run3_btagWP712_template_for_fit_histos_3D_qcd_f_80_9999_2MCGEN_merged.root"; // qcd sample templates 
-        : "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/bJet/agg_ntuple_chunks/MergedResult_btagWP712_MattProd/Run3_btagWP712_template_for_fit_histos_3D_bjet_f_80_9999_2MCGEN_merged.root"; // bjet sample templates 
+        : "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/QCD/agg_ntuple_chunks/MergedResult_btagWP712_MattProd/Run3_btagWP712_template_for_fit_histos_3D_qcd_f_80_9999_2MCGEN_merged.root"; // qcd sample templates 
+        // : "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/bJet/agg_ntuple_chunks/MergedResult_btagWP712_MattProd/Run3_btagWP712_template_for_fit_histos_3D_bjet_f_80_9999_2MCGEN_merged.root"; // bjet sample templates 
 
 
     std::cout << "Getting data from " << filename_data << std::endl; //
@@ -1284,8 +1284,6 @@ void apply_unfolding(TString &label, TString &folder, bool btag, Int_t n, TStrin
 // e.g.  root -l 'apply_unfolding_2d.C(2, true, true)'   // data, Bayesian, scan the iterations
 void apply_unfolding_2d(int test_mode = 2, bool unfoldBayes = true, bool scan_niter = false){
     TString dataset = "data" ; 
-    // TString dataset = "test_qcdtoZoeqcd"; // test mode
-    // TString dataset = "data_qcdRmatrix_correctedPurity";
     test_mode = 2; // 0 1 2 
     unfoldBayes = true; // false true 
     scan_niter = true;
@@ -1296,9 +1294,9 @@ void apply_unfolding_2d(int test_mode = 2, bool unfoldBayes = true, bool scan_ni
     // TString folder = "/data_CMS/cms/zaidan/bJetAggRun3/PPRef2024/results/unfolding_upartv2/"; // Zoe directory
     
     // TString folder = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/results/unfolding_qcd_upartv2/"; // Afnan 
-    TString folder = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/results/unfolding_bjet_upartv2/"; // Afnan 
+    // TString folder = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/results/unfolding_bjet_upartv2/"; // Afnan 
     // TString folder = "/data_CMS/cms/shatat/bJetAggRun3/PPRef2024/results/unfolding_Rqcdbjet_upartv2/"; // Afnan 
-    // TString folder = "/home/llr/cms/shatat/CMSAnalysis/eec_2b_analysis/workflow/unfolding_test/"; // test 
+    TString folder = "/home/llr/cms/shatat/CMSAnalysis/eec_2b_analysis/workflow/unfolding_test/"; // test 
 
     gSystem->mkdir(folder, kTRUE);
     TString pT_selection = "80_inf";
